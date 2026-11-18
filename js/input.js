@@ -35,11 +35,11 @@ export class InteractionInput {
       if (heldPiece && !pinched) {
         this.game.releaseGrab(heldPiece);
         state.wasPinched = pinched;
-        continue;
+        return;
       }
       if (heldPiece) {
         state.wasPinched = pinched;
-        continue;
+        return;
       }
 
       const hit = this.findHandHit(handPointer);
