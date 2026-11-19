@@ -184,6 +184,31 @@ export class ClassificationGame {
     target.y = THREE.MathUtils.clamp(target.y, piece.clearance + 0.12, 2.25);
     target.z = THREE.MathUtils.clamp(target.z, -halfDepth, halfDepth);
 
+    // Al sacar una pieza de una mesa, mantenla apenas por encima del tablero
+    // hasta que sus coordenadas horizontales estén fuera de la mesa. Así la
+    // mano no tiene que luchar contra el guardia de colisión para llevarla al
+    // contenedor vecino.
+    const supportingTable = this.sceneData.tables?.find((table) => {
+      const insideX = Math.abs(piece.body.position.x - table.x)
+        <= table.width / 2 - piece.clearance * 0.25;
+      const insideZ = Math.abs(piece.body.position.z - table.z)
+        <= table.depth / 2 - piece.clearance * 0.25;
+      return insideX && insideZ
+        && piece.body.position.y >= table.topY + piece.shape.height / 2 - 0.04;
+    });
+    if (supportingTable) {
+      const leavesTable = Math.abs(target.x - supportingTable.x)
+        > supportingTable.width / 2 - piece.clearance * 0.25
+        || Math.abs(target.z - supportingTable.z)
+        > supportingTable.depth / 2 - piece.clearance * 0.25;
+      if (leavesTable) {
+        target.y = Math.max(
+          target.y,
+          supportingTable.topY + piece.shape.height / 2 + 0.04,
+        );
+      }
+    }
+
     const safeDelta = Math.max(delta, 1 / 120);
     const currentPosition = new THREE.Vector3(
       piece.body.position.x,
@@ -356,13 +381,15 @@ export class ClassificationGame {
 
   findContainingBin(piece) {
     return this.sceneData.bins.find((bin) => {
-      const tolerance = 0.06;
-      const relativeX = piece.body.position.x - bin.x;
-      const relativeZ = piece.body.position.z - bin.z;
-      const insideX = Math.abs(relativeX) <= bin.width / 2 + tolerance;
-      const insideZ = Math.abs(relativeZ) <= bin.depth / 2 + tolerance;
-      const insideY = piece.body.position.y >= bin.baseY - tolerance
-        && piece.body.position.y <= bin.topY + piece.shape.height / 2 + tolerance;
+      piece.body.updateAABB();
+      const tolerance = 0.02;
+      const { lowerBound, upperBound } = piece.body.aabb;
+      const insideX = lowerBound.x >= bin.x - bin.innerWidth / 2 - tolerance
+        && upperBound.x <= bin.x + bin.innerWidth / 2 + tolerance;
+      const insideZ = lowerBound.z >= bin.z - bin.innerDepth / 2 - tolerance
+        && upperBound.z <= bin.z + bin.innerDepth / 2 + tolerance;
+      const insideY = lowerBound.y >= bin.baseY - tolerance
+        && upperBound.y <= bin.topY + tolerance;
       return insideX && insideZ && insideY;
     }) ?? null;
   }
