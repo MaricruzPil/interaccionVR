@@ -4,7 +4,7 @@ export const APP_CONFIG = {
   threeVersion: '0.160.0',
   cannonVersion: '0.20.0',
   room: { width: 5.8, depth: 4.8, height: 2.6 },
-  table: { width: 1.42, depth: 0.82, topY: 0.84, thickness: 0.12 },
+  table: { width: 1.48, depth: 1.08, topY: 0.84, thickness: 0.12 },
   bin: { width: 0.76, depth: 0.68, height: 0.52, wall: 0.075, base: 0.08 },
   physics: {
     gravity: -9.81,
@@ -105,6 +105,12 @@ export const PIECE_STATES = Object.freeze({
   ERROR: 'error',
   RECOVERABLE: 'recuperable',
 });
+
+export function getShapeClearance(shape) {
+  if (shape.kind === 'box') return Math.sqrt(3) * (shape.size / 2);
+  if (shape.kind === 'pyramid') return Math.sqrt(2) * shape.radius;
+  return shape.radius;
+}
 
 export function getShapeDefinition(id) {
   return SHAPE_DEFINITIONS.find((shape) => shape.id === id);

@@ -5,17 +5,18 @@ import {
   COLORS,
   SHAPE_DEFINITIONS,
   TABLE_POSITIONS,
+  getShapeClearance,
   getShapeDefinition,
   shuffle,
 } from './config.js';
 import { addPieceBody, addStaticBox, setBodyDynamic } from './physics.js';
 
 const SLOT_POSITIONS = [
-  { x: -0.44, z: -0.22 },
-  { x: 0, z: -0.22 },
-  { x: 0.44, z: -0.22 },
-  { x: -0.22, z: 0.22 },
-  { x: 0.22, z: 0.22 },
+  { x: -0.46, z: -0.27 },
+  { x: 0, z: -0.27 },
+  { x: 0.46, z: -0.27 },
+  { x: -0.24, z: 0.27 },
+  { x: 0.24, z: 0.27 },
 ];
 
 function makeMaterial(color, emissive = 0x000000, roughness = 0.34, metalness = 0.16) {
@@ -71,7 +72,16 @@ function createPieceMesh(shape) {
   let geometry;
   if (shape.kind === 'sphere') geometry = new THREE.SphereGeometry(shape.radius, 20, 14);
   if (shape.kind === 'box') geometry = new THREE.BoxGeometry(shape.size, shape.size, shape.size);
-  if (shape.kind === 'pyramid') geometry = new THREE.ConeGeometry(shape.radius, shape.height, 4);
+  if (shape.kind === 'pyramid') {
+    geometry = new THREE.ConeGeometry(
+      shape.radius * Math.SQRT2,
+      shape.height,
+      4,
+      1,
+      false,
+      Math.PI / 4,
+    );
+  }
   if (shape.kind === 'hex-prism') {
     geometry = new THREE.CylinderGeometry(shape.radius, shape.radius, shape.height, 6);
   }
@@ -342,6 +352,99 @@ function createPanel(scene) {
   return { mesh: panelMesh, update };
 }
 
+function segmentEntryTime(start, end, lower, upper) {
+  let entry = 0;
+  let exit = 1;
+  const starts = [start.x, start.y, start.z];
+  const deltas = [end.x - start.x, end.y - start.y, end.z - start.z];
+  const lowers = [lower.x, lower.y, lower.z];
+  const uppers = [upper.x, upper.y, upper.z];
+
+  for (let axis = 0; axis < 3; axis += 1) {
+    if (Math.abs(deltas[axis]) < 1e-8) {
+      if (starts[axis] < lowers[axis] || starts[axis] > uppers[axis]) return null;
+      continue;
+    }
+    let axisEntry = (lowers[axis] - starts[axis]) / deltas[axis];
+    let axisExit = (uppers[axis] - starts[axis]) / deltas[axis];
+    if (axisEntry > axisExit) [axisEntry, axisExit] = [axisExit, axisEntry];
+    entry = Math.max(entry, axisEntry);
+    exit = Math.min(exit, axisExit);
+    if (entry > exit) return null;
+  }
+  return entry >= 0 && entry <= 1 ? entry : null;
+}
+
+function createKinematicMoveGuard(world) {
+  const start = new THREE.Vector3();
+  const delta = new THREE.Vector3();
+  const safeTarget = new THREE.Vector3();
+  const lower = new THREE.Vector3();
+  const upper = new THREE.Vector3();
+
+  return (piece, current, target) => {
+    start.copy(current);
+    delta.copy(target).sub(current);
+    let safeFactor = 1;
+    const horizontalClearance = piece.clearance + 0.008;
+    const verticalClearance = piece.shape.height / 2 + 0.008;
+
+    world.bodies.forEach((obstacle) => {
+      if (obstacle === piece.body || !obstacle.shape) return;
+      obstacle.computeAABB();
+      lower.set(
+        obstacle.aabb.lowerBound.x - horizontalClearance,
+        obstacle.aabb.lowerBound.y - verticalClearance,
+        obstacle.aabb.lowerBound.z - horizontalClearance,
+      );
+      upper.set(
+        obstacle.aabb.upperBound.x + horizontalClearance,
+        obstacle.aabb.upperBound.y + verticalClearance,
+        obstacle.aabb.upperBound.z + horizontalClearance,
+      );
+      const hitTime = segmentEntryTime(start, target, lower, upper);
+      if (hitTime !== null) safeFactor = Math.min(safeFactor, Math.max(0, hitTime - 0.012));
+    });
+
+    return safeTarget.copy(start).addScaledVector(delta, safeFactor);
+  };
+}
+
+function isPlacementSafe(position, shape, placements) {
+  const clearance = getShapeClearance(shape);
+  const margin = 0.012;
+  if (
+    Math.abs(position.x) + clearance + margin > APP_CONFIG.table.width / 2
+    || Math.abs(position.z) + clearance + margin > APP_CONFIG.table.depth / 2
+  ) return false;
+
+  return placements.every((placed) => {
+    const otherClearance = getShapeClearance(placed.shape);
+    return Math.abs(position.x - placed.position.x) > clearance + otherClearance + margin
+      || Math.abs(position.z - placed.position.z) > clearance + otherClearance + margin;
+  });
+}
+
+function createSafePlacements(shapes, random) {
+  const placements = [];
+  SLOT_POSITIONS.forEach((slot, index) => {
+    const shape = shapes[index];
+    const candidate = {
+      x: slot.x + (random() - 0.5) * 0.025,
+      z: slot.z + (random() - 0.5) * 0.025,
+    };
+    const position = isPlacementSafe(candidate, shape, placements)
+      ? candidate
+      : { ...slot };
+    placements.push({ position, shape });
+  });
+  return placements.every((placement, index) => (
+    isPlacementSafe(placement.position, placement.shape, placements.slice(0, index))
+  ))
+    ? placements
+    : SLOT_POSITIONS.map((position, index) => ({ position: { ...position }, shape: shapes[index] }));
+}
+
 function createActionButton(scene, { label, action, x, y, z, color }) {
   const group = new THREE.Group();
   group.position.set(x, y, z);
@@ -416,7 +519,9 @@ function createPieceRecords(scene, world, materials) {
         grabQuaternion: new THREE.Quaternion(),
         lastPosition: new THREE.Vector3(),
         lastHandVelocity: new THREE.Vector3(),
-        clearance: shape.kind === 'sphere' ? shape.radius : shape.radius * 0.92,
+        initialPosition: new THREE.Vector3(),
+        initialQuaternion: new THREE.Quaternion(),
+        clearance: getShapeClearance(shape),
       };
       mesh.userData.piece = piece;
       scene.add(mesh);
@@ -437,20 +542,21 @@ export function createLabScene({ scene, world, materials }) {
   const bins = BIN_POSITIONS.map((bin) => createBin(scene, world, materials, bin));
   const { pieces, slotPositions } = createPieceRecords(scene, world, materials);
   const scorePanel = createPanel(scene);
+  const clampKinematicTarget = createKinematicMoveGuard(world);
   const startButton = createActionButton(scene, {
     label: 'COMENZAR',
     action: 'start',
-    x: -0.32,
-    y: 1.05,
-    z: -1.67,
+    x: 0.98,
+    y: 2.10,
+    z: -1.86,
     color: COLORS.mint,
   });
   const resetButton = createActionButton(scene, {
     label: 'REINICIAR',
     action: 'reset',
-    x: 0.32,
-    y: 1.05,
-    z: -1.67,
+    x: 1.57,
+    y: 2.10,
+    z: -1.86,
     color: COLORS.coral,
   });
 
@@ -461,18 +567,21 @@ export function createLabScene({ scene, world, materials }) {
   ];
 
   function resetPieces(random = Math.random) {
+    const placementsByTable = TABLE_POSITIONS.map((_, tableIndex) => {
+      const tablePieces = pieces.slice(tableIndex * 5, tableIndex * 5 + 5);
+      return createSafePlacements(tablePieces.map((piece) => piece.shape), random);
+    });
+
     pieces.forEach((piece, index) => {
       const tableIndex = Math.floor(index / 5);
       const slotIndex = index % 5;
       const table = TABLE_POSITIONS[tableIndex];
-      const slot = slotPositions[slotIndex];
-      const jitterX = (random() - 0.5) * 0.075;
-      const jitterZ = (random() - 0.5) * 0.075;
+      const slot = placementsByTable[tableIndex][slotIndex].position;
       const shape = piece.shape;
       const position = {
-        x: table.x + slot.x + jitterX,
+        x: table.x + slot.x,
         y: APP_CONFIG.table.topY + shape.height / 2 + 0.012,
-        z: table.z + slot.z + jitterZ,
+        z: table.z + slot.z,
       };
 
       piece.categoryId = shape.id;
@@ -480,6 +589,8 @@ export function createLabScene({ scene, world, materials }) {
       piece.tableId = table.id;
       piece.body.position.set(position.x, position.y, position.z);
       piece.body.quaternion.setFromEuler(0, random() * Math.PI * 2, 0);
+      piece.initialPosition.set(position.x, position.y, position.z);
+      piece.initialQuaternion.copy(piece.body.quaternion);
       piece.body.velocity.setZero();
       piece.body.angularVelocity.setZero();
       setBodyDynamic(piece.body, shape.mass);
@@ -508,6 +619,21 @@ export function createLabScene({ scene, world, materials }) {
     resetButton,
     interactables,
     resetPieces,
+    recoverPiece(piece) {
+      if (!piece?.initialPosition) return;
+      piece.body.position.copy(piece.initialPosition);
+      piece.body.quaternion.copy(piece.initialQuaternion);
+      piece.body.velocity.setZero();
+      piece.body.angularVelocity.setZero();
+      piece.state = 'disponible';
+      piece.assignedBinId = null;
+      piece.errorReported = false;
+      piece.enteredBinId = null;
+      piece.stabilityTime = 0;
+      setBodyDynamic(piece.body, piece.shape.mass);
+      piece.body.wakeUp();
+    },
+    clampKinematicTarget,
   };
 }
 
@@ -541,4 +667,10 @@ export function setActionButtonLabel(button, label, color) {
   labelMesh.material.map = texture;
   labelMesh.material.needsUpdate = true;
   if (oldTexture) oldTexture.dispose();
+}
+
+export function setActionButtonVisibility(button, visible) {
+  button.group.visible = visible;
+  button.body.visible = visible;
+  button.labelMesh.visible = visible;
 }

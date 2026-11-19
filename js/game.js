@@ -10,7 +10,11 @@ import {
   setBodyKinematic,
   setBodyStatic,
 } from './physics.js';
-import { setActionButtonLabel, updateVisualTransforms } from './scene.js';
+import {
+  setActionButtonLabel,
+  setActionButtonVisibility,
+  updateVisualTransforms,
+} from './scene.js';
 
 const PHASE_LABELS = {
   idle: 'en espera',
@@ -34,6 +38,8 @@ export class ClassificationGame {
     this.lastFloorMessageAt = 0;
     this.heldPieces = new Set();
     this.metrics = this.createMetrics();
+    setActionButtonVisibility(this.sceneData.startButton, true);
+    setActionButtonVisibility(this.sceneData.resetButton, true);
     this.refreshHud(true);
   }
 
@@ -57,6 +63,8 @@ export class ClassificationGame {
     this.pausedDuration = 0;
     this.metrics = this.createMetrics();
     setActionButtonLabel(this.sceneData.startButton, 'COMENZAR', COLORS.mint);
+    setActionButtonVisibility(this.sceneData.startButton, true);
+    setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message('Escenario reiniciado. Pulsa COMENZAR dentro del laboratorio.', 'info');
     this.refreshHud(true);
   }
@@ -77,6 +85,8 @@ export class ClassificationGame {
     this.pausedDuration = 0;
     this.metrics = this.createMetrics();
     setActionButtonLabel(this.sceneData.startButton, 'EN CURSO', COLORS.mint);
+    setActionButtonVisibility(this.sceneData.startButton, false);
+    setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message('Partida iniciada. Clasifica las veinte piezas.', 'info');
     this.audio?.start();
     this.refreshHud(true);
@@ -88,6 +98,8 @@ export class ClassificationGame {
     this.pauseStartedAt = performance.now();
     this.releaseAll();
     setActionButtonLabel(this.sceneData.startButton, 'CONTINUAR', COLORS.yellow);
+    setActionButtonVisibility(this.sceneData.startButton, true);
+    setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message(reason, 'warning');
     this.refreshHud(true);
   }
@@ -98,6 +110,7 @@ export class ClassificationGame {
     this.pauseStartedAt = null;
     this.phase = 'running';
     setActionButtonLabel(this.sceneData.startButton, 'EN CURSO', COLORS.mint);
+    setActionButtonVisibility(this.sceneData.startButton, false);
     this.message('Cronómetro reanudado.', 'info');
     this.refreshHud(true);
   }
@@ -108,6 +121,8 @@ export class ClassificationGame {
     this.finishedAt = performance.now();
     this.releaseAll();
     setActionButtonLabel(this.sceneData.startButton, 'COMPLETADA', COLORS.success);
+    setActionButtonVisibility(this.sceneData.startButton, false);
+    setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message(
       `Laboratorio completo: 20/20, precisión ${this.getAccuracy()} %, errores ${this.metrics.errors}.`,
       'success',
@@ -177,15 +192,21 @@ export class ClassificationGame {
     if (displacement.length() > maximumHandMove) {
       target.copy(currentPosition).add(displacement.normalize().multiplyScalar(maximumHandMove));
     }
+    const smoothedTarget = currentPosition.clone().lerp(target, 0.82);
+    const guardedTarget = this.sceneData.clampKinematicTarget?.(
+      piece,
+      currentPosition,
+      smoothedTarget,
+    ) ?? smoothedTarget;
     piece.body.velocity.set(
-      (target.x - piece.body.position.x) / safeDelta,
-      (target.y - piece.body.position.y) / safeDelta,
-      (target.z - piece.body.position.z) / safeDelta,
+      (guardedTarget.x - piece.body.position.x) / safeDelta,
+      (guardedTarget.y - piece.body.position.y) / safeDelta,
+      (guardedTarget.z - piece.body.position.z) / safeDelta,
     );
     const velocityLength = piece.body.velocity.length();
     if (velocityLength > 4.2) piece.body.velocity.scale(4.2 / velocityLength, piece.body.velocity);
     piece.lastHandVelocity.set(piece.body.velocity.x, piece.body.velocity.y, piece.body.velocity.z);
-    piece.body.position.set(target.x, target.y, target.z);
+    piece.body.position.set(guardedTarget.x, guardedTarget.y, guardedTarget.z);
     piece.body.quaternion.set(
       piece.grabQuaternion.x,
       piece.grabQuaternion.y,
@@ -238,11 +259,31 @@ export class ClassificationGame {
   }
 
   afterPhysics(simulatedSeconds) {
+    this.sceneData.pieces.forEach((piece) => this.recoverInvalidPiece(piece));
     updateVisualTransforms(this.sceneData.pieces);
     if (this.phase === 'running') {
       this.sceneData.pieces.forEach((piece) => this.updatePieceState(piece, simulatedSeconds));
     }
     this.refreshHud();
+  }
+
+  recoverInvalidPiece(piece) {
+    if (piece.state === PIECE_STATES.CLASSIFIED || piece.state === PIECE_STATES.HELD) return;
+    const values = [
+      piece.body.position.x,
+      piece.body.position.y,
+      piece.body.position.z,
+      piece.body.velocity.x,
+      piece.body.velocity.y,
+      piece.body.velocity.z,
+    ];
+    const invalid = values.some((value) => !Number.isFinite(value));
+    const outside = Math.abs(piece.body.position.x) > APP_CONFIG.room.width / 2 + 0.4
+      || Math.abs(piece.body.position.z) > APP_CONFIG.room.depth / 2 + 0.4
+      || piece.body.position.y < -0.45;
+    if (!invalid && !outside) return;
+    this.sceneData.recoverPiece?.(piece);
+    this.message('Una pieza fue recuperada al salir del volumen físico.', 'warning');
   }
 
   updatePieceState(piece, delta) {

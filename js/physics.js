@@ -48,8 +48,8 @@ export function addStaticBox(world, materials, { x, y, z, width, height, depth, 
   return body;
 }
 
-function createPyramidShape(radius, height) {
-  const halfBase = radius * 0.82;
+export function createPyramidShape(radius, height) {
+  const halfBase = radius;
   const halfHeight = height / 2;
   const vertices = [
     new CANNON.Vec3(-halfBase, -halfHeight, -halfBase),
@@ -59,11 +59,11 @@ function createPyramidShape(radius, height) {
     new CANNON.Vec3(0, halfHeight, 0),
   ];
   const faces = [
-    [0, 3, 2, 1],
-    [0, 1, 4],
-    [1, 2, 4],
-    [2, 3, 4],
-    [3, 0, 4],
+    [0, 1, 2, 3],
+    [0, 4, 1],
+    [1, 4, 2],
+    [2, 4, 3],
+    [3, 4, 0],
   ];
   return new CANNON.ConvexPolyhedron({ vertices, faces });
 }
