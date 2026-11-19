@@ -16,7 +16,7 @@ export const APP_CONFIG = {
     nearGrabDistance: 0.36,
   },
   physics: {
-    gravity: -9.81,
+    gravity: -15.5,
     fixedStep: 1 / 60,
     maxFrameDelta: 0.1,
     maxSubSteps: 6,
