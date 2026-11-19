@@ -4,7 +4,6 @@ import {
   COLORS,
   PIECE_STATES,
   SHAPE_DEFINITIONS,
-  getShapeHorizontalExtent,
 } from './config.js';
 import {
   setBodyDynamic,
@@ -424,14 +423,17 @@ export class ClassificationGame {
       piece.body.updateAABB();
       const tolerance = 0.02;
       const { lowerBound } = piece.body.aabb;
-      const horizontalExtent = getShapeHorizontalExtent(piece.shape);
-      const insideX = Math.abs(piece.body.position.x - bin.x) + horizontalExtent
-        <= bin.innerWidth / 2 + tolerance;
-      const insideZ = Math.abs(piece.body.position.z - bin.z) + horizontalExtent
-        <= bin.innerDepth / 2 + tolerance;
+      // El centro debe quedar dentro del hueco, pero no exigimos que toda la
+      // figura quede por debajo del borde: las piezas pueden apilarse y
+      // sobresalir sin perder el reconocimiento.
+      const openingMargin = 0.04;
+      const insideX = Math.abs(piece.body.position.x - bin.x)
+        <= bin.innerWidth / 2 - openingMargin;
+      const insideZ = Math.abs(piece.body.position.z - bin.z)
+        <= bin.innerDepth / 2 - openingMargin;
       const insideBase = lowerBound.y >= bin.baseY - tolerance;
-      const upperEntryAllowance = Math.max(0.06, piece.shape.height * 0.4);
-      const insideHeight = piece.body.position.y <= bin.topY + upperEntryAllowance;
+      const upperEntryAllowance = Math.max(0.32, piece.shape.height * 1.25);
+      const insideHeight = lowerBound.y <= bin.topY + upperEntryAllowance;
       return insideX && insideZ && insideBase && insideHeight;
     }) ?? null;
   }

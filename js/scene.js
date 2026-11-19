@@ -489,6 +489,16 @@ function createKinematicMoveGuard(world) {
         obstacle.aabb.upperBound.y + verticalClearance,
         obstacle.aabb.upperBound.z + horizontalClearance,
       );
+      const startsInside = start.x >= lower.x && start.x <= upper.x
+        && start.y >= lower.y && start.y <= upper.y
+        && start.z >= lower.z && start.z <= upper.z;
+      const endsInside = target.x >= lower.x && target.x <= upper.x
+        && target.y >= lower.y && target.y <= upper.y
+        && target.z >= lower.z && target.z <= upper.z;
+      // Si la pieza ya está en el borde o dentro de la holgura de una pared,
+      // permitir que salga. Solo se bloquean trayectorias que entran en una
+      // superficie desde fuera.
+      if (startsInside && !endsInside) return;
       const hitTime = segmentEntryTime(start, target, lower, upper);
       if (hitTime !== null) safeFactor = Math.min(safeFactor, Math.max(0, hitTime - 0.012));
     });
