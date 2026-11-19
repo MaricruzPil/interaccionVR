@@ -4,6 +4,7 @@ import {
   COLORS,
   PIECE_STATES,
   SHAPE_DEFINITIONS,
+  getShapeHorizontalExtent,
 } from './config.js';
 import {
   setBodyDynamic,
@@ -422,14 +423,16 @@ export class ClassificationGame {
     return this.sceneData.bins.find((bin) => {
       piece.body.updateAABB();
       const tolerance = 0.02;
-      const { lowerBound, upperBound } = piece.body.aabb;
-      const insideX = lowerBound.x >= bin.x - bin.innerWidth / 2 - tolerance
-        && upperBound.x <= bin.x + bin.innerWidth / 2 + tolerance;
-      const insideZ = lowerBound.z >= bin.z - bin.innerDepth / 2 - tolerance
-        && upperBound.z <= bin.z + bin.innerDepth / 2 + tolerance;
-      const insideY = lowerBound.y >= bin.baseY - tolerance
-        && upperBound.y <= bin.topY + tolerance;
-      return insideX && insideZ && insideY;
+      const { lowerBound } = piece.body.aabb;
+      const horizontalExtent = getShapeHorizontalExtent(piece.shape);
+      const insideX = Math.abs(piece.body.position.x - bin.x) + horizontalExtent
+        <= bin.innerWidth / 2 + tolerance;
+      const insideZ = Math.abs(piece.body.position.z - bin.z) + horizontalExtent
+        <= bin.innerDepth / 2 + tolerance;
+      const insideBase = lowerBound.y >= bin.baseY - tolerance;
+      const upperEntryAllowance = Math.max(0.06, piece.shape.height * 0.4);
+      const insideHeight = piece.body.position.y <= bin.topY + upperEntryAllowance;
+      return insideX && insideZ && insideBase && insideHeight;
     }) ?? null;
   }
 
