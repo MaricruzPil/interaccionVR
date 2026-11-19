@@ -8,7 +8,6 @@ import {
 import {
   setBodyDynamic,
   setBodyKinematic,
-  setBodyStatic,
 } from './physics.js';
 import {
   setActionButtonLabel,
@@ -441,7 +440,7 @@ export class ClassificationGame {
   classify(piece, bin) {
     piece.state = PIECE_STATES.CLASSIFIED;
     piece.assignedBinId = bin.id;
-    setBodyStatic(piece.body);
+    setBodyDynamic(piece.body, piece.shape.mass);
     this.metrics.correct += 1;
     this.metrics.attempts += 1;
     this.metrics.categoryCounts[piece.categoryId] += 1;
