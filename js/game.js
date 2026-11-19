@@ -289,7 +289,7 @@ export class ClassificationGame {
 
   afterPhysics(simulatedSeconds) {
     this.sceneData.pieces.forEach((piece) => {
-      this.sceneData.resolveTablePenetration?.(piece);
+      this.sceneData.resolvePiecePenetration?.(piece);
       this.recoverInvalidPiece(piece);
     });
     updateVisualTransforms(this.sceneData.pieces);
@@ -323,9 +323,7 @@ export class ClassificationGame {
 
     const containingBin = this.findContainingBin(piece);
     if (containingBin && !piece.enteredBinId) {
-      const crossedOpening = piece.lastPosition.y >= containingBin.topY - 0.045
-        && piece.body.position.y < containingBin.topY + 0.045;
-      if (crossedOpening) piece.enteredBinId = containingBin.id;
+      piece.enteredBinId = containingBin.id;
     }
 
     if (containingBin && piece.enteredBinId === containingBin.id) {
@@ -366,12 +364,14 @@ export class ClassificationGame {
 
   findContainingBin(piece) {
     return this.sceneData.bins.find((bin) => {
-      const relativeX = piece.body.position.x - bin.x;
-      const relativeZ = piece.body.position.z - bin.z;
-      const insideX = Math.abs(relativeX) <= bin.innerWidth / 2 - piece.clearance * 0.34;
-      const insideZ = Math.abs(relativeZ) <= bin.innerDepth / 2 - piece.clearance * 0.34;
-      const insideY = piece.body.position.y >= bin.baseY + piece.clearance * 0.38
-        && piece.body.position.y <= bin.topY - piece.clearance * 0.16;
+      piece.body.updateAABB();
+      const margin = 0.008;
+      const insideX = piece.body.aabb.lowerBound.x >= bin.x - bin.innerWidth / 2 + margin
+        && piece.body.aabb.upperBound.x <= bin.x + bin.innerWidth / 2 - margin;
+      const insideZ = piece.body.aabb.lowerBound.z >= bin.z - bin.innerDepth / 2 + margin
+        && piece.body.aabb.upperBound.z <= bin.z + bin.innerDepth / 2 - margin;
+      const insideY = piece.body.aabb.lowerBound.y >= bin.baseY + margin
+        && piece.body.aabb.upperBound.y <= bin.topY + 0.02;
       return insideX && insideZ && insideY;
     }) ?? null;
   }

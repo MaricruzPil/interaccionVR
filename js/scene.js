@@ -377,10 +377,10 @@ function createLightPanel(scene) {
     context.fillRect(0, 0, width, height);
   }, 1024, 640);
   const panelMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.52, 0.96),
+    new THREE.PlaneGeometry(1.82, 1.1),
     new THREE.MeshBasicMaterial({ map: panel.texture, transparent: true }),
   );
-  panelMesh.position.set(0, 1.72, -2.25);
+  panelMesh.position.set(0, 1.76, -2.25);
   panelMesh.userData.disposeTexture = panel.texture;
   scene.add(panelMesh);
 
@@ -389,42 +389,42 @@ function createLightPanel(scene) {
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = '#f7f5ef';
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.strokeStyle = '#4e9e91';
-    context.lineWidth = 8;
+    context.strokeStyle = '#2f8178';
+    context.lineWidth = 10;
     context.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
 
-    context.fillStyle = '#4e9e91';
-    context.font = '700 42px Arial, sans-serif';
+    context.fillStyle = '#2f8178';
+    context.font = '700 50px Arial, sans-serif';
     context.fillText('LABORATORIO / 3.2', 48, 70);
-    context.fillStyle = '#26383a';
-    context.font = '700 68px Arial, sans-serif';
+    context.fillStyle = '#172f32';
+    context.font = '700 78px Arial, sans-serif';
     context.fillText(`${snapshot.correct}/20`, 48, 154);
-    context.fillStyle = '#687978';
-    context.font = '700 28px Arial, sans-serif';
+    context.fillStyle = '#526866';
+    context.font = '700 32px Arial, sans-serif';
     context.fillText(`correctos   ${snapshot.elapsed}s`, 250, 151);
 
     context.fillStyle = '#526866';
-    context.font = '700 27px Arial, sans-serif';
+    context.font = '700 30px Arial, sans-serif';
     context.fillText('desglose por forma · bien / mal', 48, 205);
     const lines = [
       `Esferas     ${snapshot.correctByCategory.esfera} / ${snapshot.incorrectByCategory.esfera}`,
       `Cubos       ${snapshot.correctByCategory.cubo} / ${snapshot.incorrectByCategory.cubo}`,
-      `Piramides   ${snapshot.correctByCategory.piramide} / ${snapshot.incorrectByCategory.piramide}`,
+      `Pirámides   ${snapshot.correctByCategory.piramide} / ${snapshot.incorrectByCategory.piramide}`,
       `Prismas     ${snapshot.correctByCategory.prisma} / ${snapshot.incorrectByCategory.prisma}`,
     ];
-    context.fillStyle = '#26383a';
-    context.font = '700 30px Arial, sans-serif';
+    context.fillStyle = '#172f32';
+    context.font = '700 34px Arial, sans-serif';
     lines.forEach((line, index) => context.fillText(line, 48, 250 + index * 42));
 
     context.fillStyle = '#687978';
-    context.font = '26px Arial, sans-serif';
+    context.font = '28px Arial, sans-serif';
     context.fillText(`errores ${snapshot.errors} · intentos ${snapshot.attempts}`, 48, 435);
     context.fillText(`precision ${snapshot.accuracy}% · tiempo total ${snapshot.elapsed}s`, 48, 470);
     context.fillStyle = snapshot.phase === 'finished' ? '#569b73' : '#c6a15a';
-    context.font = '700 32px Arial, sans-serif';
+    context.font = '700 36px Arial, sans-serif';
     context.fillText(snapshot.phaseLabel, 48, 515);
     context.fillStyle = '#687978';
-    context.font = '24px Arial, sans-serif';
+    context.font = '26px Arial, sans-serif';
     const timeText = snapshot.binTimes
       .map((time) => (time === null ? 'pendiente' : `${time}s`))
       .join('  ·  ');
@@ -438,12 +438,12 @@ function createLightPanel(scene) {
 function createNotification(scene) {
   const panel = makeCanvasTexture((context, width, height) => {
     context.clearRect(0, 0, width, height);
-  }, 1024, 160);
+  }, 1024, 220);
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.46, 0.23),
+    new THREE.PlaneGeometry(1.78, 0.32),
     new THREE.MeshBasicMaterial({ map: panel.texture, transparent: true }),
   );
-  mesh.position.set(0.92, 1.62, -1.84);
+  mesh.position.set(0, 1.15, -1.9);
   mesh.renderOrder = 4;
   mesh.visible = false;
   mesh.userData.disposeTexture = panel.texture;
@@ -468,11 +468,33 @@ function createNotification(scene) {
     context.strokeStyle = accent;
     context.lineWidth = 6;
     context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    context.fillStyle = '#26383a';
-    context.font = '700 34px Arial, sans-serif';
+    context.fillStyle = '#172f32';
+    context.font = '700 30px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(text.slice(0, 72), canvas.width / 2 + 8, canvas.height / 2);
+    const maxWidth = canvas.width - 100;
+    const words = text.split(/\s+/);
+    const lines = [];
+    let currentLine = '';
+    words.forEach((word) => {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (currentLine && context.measureText(candidate).width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = candidate;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    const visibleLines = lines.slice(0, 2);
+    const lineHeight = 42;
+    visibleLines.forEach((line, index) => {
+      context.fillText(
+        line,
+        canvas.width / 2 + 8,
+        canvas.height / 2 + (index - (visibleLines.length - 1) / 2) * lineHeight,
+      );
+    });
     panel.texture.needsUpdate = true;
     mesh.visible = true;
     if (timeoutId) window.clearTimeout(timeoutId);
@@ -774,6 +796,89 @@ export function createLabScene({ scene, world, materials }) {
     return true;
   }
 
+  function resolveBinPenetration(piece) {
+    if (!piece || piece.state === 'sujeto' || piece.state === 'clasificado') return false;
+    let corrected = false;
+    const epsilon = 0.006;
+
+    bins.forEach((bin) => {
+      piece.body.updateAABB();
+      const aabb = piece.body.aabb;
+      const halfX = (aabb.upperBound.x - aabb.lowerBound.x) / 2;
+      const halfY = (aabb.upperBound.y - aabb.lowerBound.y) / 2;
+      const halfZ = (aabb.upperBound.z - aabb.lowerBound.z) / 2;
+      const innerMinX = bin.x - bin.innerWidth / 2;
+      const innerMaxX = bin.x + bin.innerWidth / 2;
+      const innerMinZ = bin.z - bin.innerDepth / 2;
+      const innerMaxZ = bin.z + bin.innerDepth / 2;
+      const outerMinX = bin.x - APP_CONFIG.bin.width / 2;
+      const outerMaxX = bin.x + APP_CONFIG.bin.width / 2;
+      const outerMinZ = bin.z - APP_CONFIG.bin.depth / 2;
+      const outerMaxZ = bin.z + APP_CONFIG.bin.depth / 2;
+      const position = piece.body.position;
+      const verticalOverlap = aabb.upperBound.y > bin.baseY - epsilon
+        && aabb.lowerBound.y < bin.topY + epsilon;
+      const insideFootprint = position.x > innerMinX && position.x < innerMaxX
+        && position.z > innerMinZ && position.z < innerMaxZ;
+
+      if (insideFootprint && aabb.lowerBound.y < bin.baseY + epsilon) {
+        position.y = bin.baseY + halfY + epsilon;
+        if (piece.body.velocity.y < 0) piece.body.velocity.y = 0;
+        piece.body.aabbNeedsUpdate = true;
+        corrected = true;
+      }
+
+      if (!verticalOverlap) return;
+
+      const overlapsBinZ = aabb.upperBound.z > outerMinZ && aabb.lowerBound.z < outerMaxZ;
+      const overlapsBinX = aabb.upperBound.x > outerMinX && aabb.lowerBound.x < outerMaxX;
+      const wasInsideX = piece.lastPosition.x >= innerMinX && piece.lastPosition.x <= innerMaxX;
+      const wasInsideZ = piece.lastPosition.z >= innerMinZ && piece.lastPosition.z <= innerMaxZ;
+
+      if (overlapsBinZ && aabb.upperBound.x > outerMinX && aabb.lowerBound.x < innerMinX) {
+        position.x = wasInsideX
+          ? innerMinX + halfX + epsilon
+          : outerMinX - halfX - epsilon;
+        piece.body.velocity.x = 0;
+        piece.body.aabbNeedsUpdate = true;
+        corrected = true;
+      } else if (overlapsBinZ && aabb.lowerBound.x < outerMaxX && aabb.upperBound.x > innerMaxX) {
+        position.x = wasInsideX
+          ? innerMaxX - halfX - epsilon
+          : outerMaxX + halfX + epsilon;
+        piece.body.velocity.x = 0;
+        piece.body.aabbNeedsUpdate = true;
+        corrected = true;
+      }
+
+      piece.body.updateAABB();
+      const updatedAabb = piece.body.aabb;
+      if (overlapsBinX && updatedAabb.upperBound.z > outerMinZ && updatedAabb.lowerBound.z < innerMinZ) {
+        position.z = wasInsideZ
+          ? innerMinZ + halfZ + epsilon
+          : outerMinZ - halfZ - epsilon;
+        piece.body.velocity.z = 0;
+        piece.body.aabbNeedsUpdate = true;
+        corrected = true;
+      } else if (overlapsBinX && updatedAabb.lowerBound.z < outerMaxZ && updatedAabb.upperBound.z > innerMaxZ) {
+        position.z = wasInsideZ
+          ? innerMaxZ - halfZ - epsilon
+          : outerMaxZ + halfZ + epsilon;
+        piece.body.velocity.z = 0;
+        piece.body.aabbNeedsUpdate = true;
+        corrected = true;
+      }
+    });
+
+    return corrected;
+  }
+
+  function resolvePiecePenetration(piece) {
+    const tableCorrected = resolveTablePenetration(piece);
+    const binCorrected = resolveBinPenetration(piece);
+    return tableCorrected || binCorrected;
+  }
+
   return {
     tables,
     bins,
@@ -801,6 +906,7 @@ export function createLabScene({ scene, world, materials }) {
     },
     clampKinematicTarget,
     resolveTablePenetration,
+    resolvePiecePenetration,
   };
 }
 
