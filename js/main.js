@@ -174,6 +174,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function resize() {
+  if (renderer.xr.isPresenting) return;
   const width = Math.max(320, dom.canvasShell.clientWidth);
   const height = Math.max(360, dom.canvasShell.clientHeight || 560);
   renderer.setSize(width, height, false);

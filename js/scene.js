@@ -451,7 +451,7 @@ function createKinematicMoveGuard(world) {
 
     world.bodies.forEach((obstacle) => {
       if (obstacle === piece.body || !obstacle.shape) return;
-      obstacle.computeAABB();
+      obstacle.updateAABB();
       lower.set(
         obstacle.aabb.lowerBound.x - horizontalClearance,
         obstacle.aabb.lowerBound.y - verticalClearance,
@@ -676,12 +676,7 @@ export function createLabScene({ scene, world, materials }) {
 
   function resolveTablePenetration(piece) {
     if (!piece || piece.state === 'sujeto' || piece.state === 'clasificado') return false;
-    piece.body.computeAABB();
-    const verticalExtent = Math.max(
-      piece.shape.height / 2,
-      piece.body.aabb.upperBound.y - piece.body.position.y,
-    );
-    const supportY = verticalExtent + 0.008;
+    const supportY = piece.shape.height / 2 + 0.008;
     const table = tables.find((candidate) => {
       const relativeX = piece.body.position.x - candidate.x;
       const relativeZ = piece.body.position.z - candidate.z;
