@@ -25,6 +25,7 @@ const dom = {
   metricErrors: document.querySelector('#metric-errors'),
   metricAccuracy: document.querySelector('#metric-accuracy'),
   metricTime: document.querySelector('#metric-time'),
+  metricBreakdown: document.querySelector('#metric-category-breakdown'),
   finalSummary: document.querySelector('#final-summary'),
 };
 
@@ -55,10 +56,27 @@ function displaySnapshot(snapshot) {
   dom.metricErrors.textContent = snapshot.errors;
   dom.metricAccuracy.textContent = `${snapshot.accuracy}%`;
   dom.metricTime.textContent = `${snapshot.elapsed}s`;
+  dom.metricBreakdown.replaceChildren(...snapshot.categoryBreakdown.map((category) => {
+    const row = document.createElement('div');
+    row.className = 'category-breakdown__row';
+    const label = document.createElement('span');
+    label.textContent = category.label;
+    const totals = document.createElement('strong');
+    const correct = document.createElement('b');
+    correct.textContent = `${category.correct} bien`;
+    const incorrect = document.createElement('em');
+    incorrect.textContent = `${category.incorrect} mal`;
+    totals.append(correct, incorrect);
+    row.append(label, totals);
+    return row;
+  }));
   dom.previewStatus.textContent = `Estado: ${snapshot.phaseLabel}. ${snapshot.correct}/20 piezas validadas.`;
   if (snapshot.phase === 'finished') {
     dom.finalSummary.hidden = false;
-    dom.finalSummary.textContent = `Resultado final: ${snapshot.correct}/20 · ${snapshot.elapsed}s · ${snapshot.accuracy}% de precisión · ${snapshot.errors} errores.`;
+    const breakdown = snapshot.categoryBreakdown
+      .map((category) => `${category.label}: ${category.correct} bien / ${category.incorrect} mal`)
+      .join(' · ');
+    dom.finalSummary.textContent = `Resultado final: ${snapshot.correct}/20 · ${snapshot.elapsed}s · ${snapshot.accuracy}% de precisión · ${snapshot.errors} errores. ${breakdown}`;
   } else {
     dom.finalSummary.hidden = true;
   }
