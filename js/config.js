@@ -5,7 +5,7 @@ export const APP_CONFIG = {
   cannonVersion: '0.20.0',
   room: { width: 5.8, depth: 4.8, height: 2.6 },
   table: { width: 1.48, depth: 1.08, topY: 0.84, thickness: 0.12 },
-  bin: { width: 0.76, depth: 0.68, height: 0.52, wall: 0.075, base: 0.08 },
+  bin: { width: 0.90, depth: 0.86, height: 0.52, wall: 0.075, base: 0.08 },
   interaction: {
     grabSmoothing: 1,
     maxHandMove: 2,
