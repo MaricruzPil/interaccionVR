@@ -99,10 +99,10 @@ export const TABLE_POSITIONS = [
 ];
 
 export const BIN_POSITIONS = [
-  { id: 'bote-esfera', x: -0.72, z: -1.98, categoryId: 'esfera' },
-  { id: 'bote-cubo', x: 0.72, z: -1.98, categoryId: 'cubo' },
-  { id: 'bote-piramide', x: -0.72, z: 1.98, categoryId: 'piramide' },
-  { id: 'bote-prisma', x: 0.72, z: 1.98, categoryId: 'prisma' },
+  { id: 'bote-esfera', x: -0.48, z: -1.90, categoryId: 'esfera' },
+  { id: 'bote-cubo', x: 0.48, z: -1.90, categoryId: 'cubo' },
+  { id: 'bote-piramide', x: -0.48, z: 1.90, categoryId: 'piramide' },
+  { id: 'bote-prisma', x: 0.48, z: 1.90, categoryId: 'prisma' },
 ];
 
 export const PIECE_STATES = Object.freeze({

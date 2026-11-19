@@ -48,7 +48,7 @@ export class InteractionInput {
         this.game.handleAction(hit.mesh.userData.action);
       }
       if (hit?.piece && pinched && !state.wasPinched) {
-        this.game.beginGrab(hit.piece, handPointer);
+        this.game.beginGrab(hit.piece, handPointer, hit.point);
       }
       state.wasPinched = pinched;
     });
@@ -63,6 +63,7 @@ export class InteractionInput {
           distance: candidate.distance,
           mesh,
           piece: mesh.userData.piece ?? null,
+          point: candidate.point?.clone?.() ?? null,
         };
       }
     };
@@ -108,9 +109,9 @@ export class InteractionInput {
           .multiplyScalar(projection)
           .add(this.pointerOrigin);
         const distanceToRay = this.pointerClosestPoint.distanceTo(piece.body.position);
-        const hitRadius = Math.max(piece.clearance * 0.72, 0.105);
+        const hitRadius = Math.max(piece.clearance * 1.05, 0.14);
         if (distanceToRay <= hitRadius) {
-          consider({ distance: projection }, piece.mesh);
+          consider({ distance: projection, point: this.pointerClosestPoint }, piece.mesh);
         }
       });
     }

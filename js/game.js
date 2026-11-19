@@ -136,19 +136,20 @@ export class ClassificationGame {
     if (action === 'start') this.start();
   }
 
-  beginGrab(piece, pointer) {
+  beginGrab(piece, pointer, grabPoint = null) {
     if (this.phase !== 'running' || !piece || piece.state === PIECE_STATES.CLASSIFIED) return false;
     if (piece.heldBy || this.heldPieces.has(piece)) return false;
     if (!pointer?.pointerObject) return false;
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
+    const grabAnchor = grabPoint?.isVector3 ? grabPoint : pointerPosition;
     piece.grabMode = 'near';
     piece.grabDistance = pointerPosition.distanceTo(piece.body.position);
     piece.grabOffset.set(
-      piece.body.position.x - pointerPosition.x,
-      piece.body.position.y - pointerPosition.y,
-      piece.body.position.z - pointerPosition.z,
+      piece.body.position.x - grabAnchor.x,
+      piece.body.position.y - grabAnchor.y,
+      piece.body.position.z - grabAnchor.z,
     );
     piece.grabQuaternion.set(
       piece.body.quaternion.x,
