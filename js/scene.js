@@ -230,6 +230,10 @@ function createBin(scene, world, materials, binDefinition) {
 
   return {
     ...binDefinition,
+    width,
+    depth,
+    height,
+    wall,
     mesh: group,
     shape,
     baseY: base,
@@ -392,10 +396,31 @@ function createNotification(scene) {
     context.lineWidth = 6;
     context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
     context.fillStyle = '#eaf5ef';
-    context.font = '700 34px Arial, sans-serif';
+    context.font = '700 30px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(text.slice(0, 72), canvas.width / 2 + 8, canvas.height / 2);
+    const maxWidth = canvas.width - 88;
+    const lines = [];
+    let currentLine = '';
+    text.split(/\s+/).forEach((word) => {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (currentLine && context.measureText(candidate).width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = candidate;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    const visibleLines = lines.slice(0, 3);
+    const lineHeight = 34;
+    visibleLines.forEach((line, index) => {
+      context.fillText(
+        line,
+        canvas.width / 2 + 8,
+        canvas.height / 2 + (index - (visibleLines.length - 1) / 2) * lineHeight,
+      );
+    });
     panel.texture.needsUpdate = true;
     mesh.visible = true;
     if (timeoutId) window.clearTimeout(timeoutId);
@@ -449,7 +474,10 @@ function createKinematicMoveGuard(world) {
     const verticalClearance = piece.shape.height / 2 + 0.002;
 
     world.bodies.forEach((obstacle) => {
-      if (obstacle === piece.body || !obstacle.shape) return;
+      // Las piezas dinámicas no deben bloquear el seguimiento de la mano:
+      // mientras se sostiene una figura ya no tienen respuesta de colisión.
+      // Solo las superficies del laboratorio limitan el movimiento.
+      if (obstacle === piece.body || obstacle.userData?.kind !== 'environment') return;
       obstacle.updateAABB();
       lower.set(
         obstacle.aabb.lowerBound.x - horizontalClearance,

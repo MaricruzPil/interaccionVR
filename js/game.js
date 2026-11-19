@@ -322,10 +322,12 @@ export class ClassificationGame {
         piece.stabilityTime = 0;
       }
 
-      const stable = piece.body.velocity.length() <= APP_CONFIG.physics.stableLinearSpeed
-        && piece.body.angularVelocity.length() <= APP_CONFIG.physics.stableAngularSpeed;
-      piece.stabilityTime = stable ? piece.stabilityTime + delta : 0;
-      if (piece.stabilityTime >= APP_CONFIG.physics.stabilitySeconds) {
+      // La confirmación depende de permanecer dentro del bote, no de que la
+      // pieza deje de girar por completo. La física sigue activa mientras tanto.
+      piece.stabilityTime += delta;
+      const confirmationTime = APP_CONFIG.physics.containmentConfirmSeconds
+        ?? APP_CONFIG.physics.stabilitySeconds;
+      if (piece.stabilityTime >= confirmationTime) {
         if (containingBin.categoryId === piece.categoryId) {
           this.classify(piece, containingBin);
         } else {
@@ -353,14 +355,13 @@ export class ClassificationGame {
 
   findContainingBin(piece) {
     return this.sceneData.bins.find((bin) => {
-      piece.body.updateAABB();
-      const tolerance = 0.025;
-      const insideX = piece.body.aabb.lowerBound.x >= bin.x - bin.innerWidth / 2 - tolerance
-        && piece.body.aabb.upperBound.x <= bin.x + bin.innerWidth / 2 + tolerance;
-      const insideZ = piece.body.aabb.lowerBound.z >= bin.z - bin.innerDepth / 2 - tolerance
-        && piece.body.aabb.upperBound.z <= bin.z + bin.innerDepth / 2 + tolerance;
-      const insideY = piece.body.aabb.lowerBound.y >= bin.baseY - tolerance
-        && piece.body.aabb.upperBound.y <= bin.topY + tolerance;
+      const tolerance = 0.06;
+      const relativeX = piece.body.position.x - bin.x;
+      const relativeZ = piece.body.position.z - bin.z;
+      const insideX = Math.abs(relativeX) <= bin.width / 2 + tolerance;
+      const insideZ = Math.abs(relativeZ) <= bin.depth / 2 + tolerance;
+      const insideY = piece.body.position.y >= bin.baseY - tolerance
+        && piece.body.position.y <= bin.topY + piece.shape.height / 2 + tolerance;
       return insideX && insideZ && insideY;
     }) ?? null;
   }

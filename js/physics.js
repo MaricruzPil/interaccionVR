@@ -44,6 +44,7 @@ export function addStaticBox(world, materials, { x, y, z, width, height, depth, 
     position: new CANNON.Vec3(x, y, z),
   });
   body.label = label;
+  body.userData = { kind: 'environment', label };
   world.addBody(body);
   return body;
 }
