@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   bin: { width: 0.76, depth: 0.68, height: 0.52, wall: 0.075, base: 0.08 },
   interaction: {
     grabSmoothing: 1,
-    maxHandMove: 1.2,
+    maxHandMove: 2,
     maxGrabVelocity: 12,
     maxReleaseVelocity: 4.2,
     remoteGrabDistance: 0.72,

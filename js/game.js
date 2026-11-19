@@ -209,6 +209,29 @@ export class ClassificationGame {
       }
     }
 
+    // Entra primero por encima del borde y baja después de quedar dentro del
+    // hueco. Esto evita que el guardia de colisión detenga la pieza contra una
+    // pared del contenedor cuando se intenta arrastrarla de lado.
+    const targetBin = this.sceneData.bins?.find((bin) => {
+      const insideX = Math.abs(target.x - bin.x)
+        <= bin.innerWidth / 2 - piece.clearance * 0.25;
+      const insideZ = Math.abs(target.z - bin.z)
+        <= bin.innerDepth / 2 - piece.clearance * 0.25;
+      return insideX && insideZ;
+    });
+    if (targetBin) {
+      const alreadyInside = Math.abs(piece.body.position.x - targetBin.x)
+        <= targetBin.innerWidth / 2 - piece.clearance * 0.25
+        && Math.abs(piece.body.position.z - targetBin.z)
+          <= targetBin.innerDepth / 2 - piece.clearance * 0.25;
+      if (!alreadyInside) {
+        target.y = Math.max(
+          target.y,
+          targetBin.topY + piece.shape.height / 2 + 0.04,
+        );
+      }
+    }
+
     const safeDelta = Math.max(delta, 1 / 120);
     const currentPosition = new THREE.Vector3(
       piece.body.position.x,
