@@ -7,13 +7,10 @@ export const APP_CONFIG = {
   table: { width: 1.48, depth: 1.08, topY: 0.84, thickness: 0.12 },
   bin: { width: 0.76, depth: 0.68, height: 0.52, wall: 0.075, base: 0.08 },
   interaction: {
-    grabSmoothing: 0.985,
-    maxHandMove: 0.65,
-    maxGrabVelocity: 12,
-    maxReleaseVelocity: 1.8,
-    grabSettleMs: 140,
-    releaseMomentumThreshold: 1.15,
-    binAssistDistance: 0.34,
+    grabSmoothing: 0.94,
+    maxHandMove: 0.3,
+    maxGrabVelocity: 6.5,
+    maxReleaseVelocity: 4.2,
     remoteGrabDistance: 0.72,
     nearGrabDistance: 0.36,
   },
@@ -30,19 +27,19 @@ export const APP_CONFIG = {
 };
 
 export const COLORS = {
-  ink: 0xe8efeb,
-  deep: 0xd7e4e0,
-  panel: 0x9bb8b4,
-  grid: 0x789793,
-  white: 0xf7f5ef,
-  muted: 0x687978,
-  mint: 0x4e9e91,
-  coral: 0xc97e6b,
-  yellow: 0xc6a15a,
-  blue: 0x7faac4,
-  violet: 0x8e7eb0,
-  success: 0x569b73,
-  danger: 0xc65e6b,
+  ink: 0x07151d,
+  deep: 0x0b2430,
+  panel: 0x102f3c,
+  grid: 0x2e5964,
+  white: 0xeaf5ef,
+  muted: 0xa3c5c2,
+  mint: 0x54e0c1,
+  coral: 0xff7962,
+  yellow: 0xf4c866,
+  blue: 0x6da8ff,
+  violet: 0xb68cff,
+  success: 0x6ce6a5,
+  danger: 0xff647c,
 };
 
 export const SHAPE_DEFINITIONS = [
@@ -122,7 +119,6 @@ export function getShapeClearance(shape) {
   if (shape.kind === 'pyramid') return Math.sqrt(2) * shape.radius;
   return shape.radius;
 }
-
 export function getShapeHorizontalExtent(shape) {
   if (shape.kind === 'box') return shape.size / 2;
   return shape.radius;

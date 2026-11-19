@@ -29,7 +29,6 @@ function makeMaterial(color, emissive = 0x000000, roughness = 0.34, metalness = 
     metalness,
   });
 }
-
 function makeCanvasTexture(draw, width = 1024, height = 512) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -50,12 +49,12 @@ function roundedRect(context, x, y, width, height, radius) {
 
 function makeLabelPlane(text, color, width = 0.62, height = 0.18) {
   const { texture } = makeCanvasTexture((context, canvasWidth, canvasHeight) => {
-    context.fillStyle = '#334c4c';
+    context.fillStyle = '#0c2731';
     context.fillRect(0, 0, canvasWidth, canvasHeight);
     context.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
     context.lineWidth = 12;
     context.strokeRect(8, 8, canvasWidth - 16, canvasHeight - 16);
-    context.fillStyle = '#f7f5ef';
+    context.fillStyle = '#eaf5ef';
     context.font = '700 68px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -207,14 +206,9 @@ function createBin(scene, world, materials, binDefinition) {
     });
   });
 
-  const rimMaterial = new THREE.LineBasicMaterial({
-    color: shape.color,
-    transparent: true,
-    opacity: 0.85,
-  });
   const rim = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, depth)),
-    rimMaterial,
+    new THREE.LineBasicMaterial({ color: shape.color, transparent: true, opacity: 0.85 }),
   );
   rim.position.y = base + height / 2;
   group.add(rim);
@@ -234,12 +228,6 @@ function createBin(scene, world, materials, binDefinition) {
     label: `${binDefinition.id}-base`,
   });
 
-  function setHighlight(active, correct = false) {
-    rimMaterial.color.setHex(active ? (correct ? COLORS.success : COLORS.danger) : shape.color);
-    rimMaterial.opacity = active ? 1 : 0.85;
-    group.scale.setScalar(active ? 1.035 : 1);
-  }
-
   return {
     ...binDefinition,
     mesh: group,
@@ -248,7 +236,6 @@ function createBin(scene, world, materials, binDefinition) {
     topY: base + height,
     innerWidth: width - wall * 2,
     innerDepth: depth - wall * 2,
-    setHighlight,
   };
 }
 
@@ -327,24 +314,24 @@ function createPanel(scene) {
   function update(snapshot) {
     const { context, canvas } = panel;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#f7f5ef';
+    context.fillStyle = '#0b2731';
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.strokeStyle = '#4e9e91';
+    context.strokeStyle = '#54e0c1';
     context.lineWidth = 8;
     context.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
 
-    context.fillStyle = '#4e9e91';
+    context.fillStyle = '#54e0c1';
     context.font = '700 44px Arial, sans-serif';
     context.fillText('INSTRUMENTACIÓN / 3.2', 48, 76);
-    context.fillStyle = '#26383a';
+    context.fillStyle = '#eaf5ef';
     context.font = '700 68px Arial, sans-serif';
     context.fillText(`${snapshot.correct}/20`, 48, 154);
-    context.fillStyle = '#687978';
+    context.fillStyle = '#a3c5c2';
     context.font = '30px Arial, sans-serif';
     context.fillText('aciertos', 250, 151);
 
     context.font = '30px Arial, sans-serif';
-    context.fillStyle = '#26383a';
+    context.fillStyle = '#eaf5ef';
     const lines = [
       `Esferas  ${snapshot.categoryCounts.esfera}/5`,
       `Cubos    ${snapshot.categoryCounts.cubo}/5`,
@@ -353,13 +340,13 @@ function createPanel(scene) {
     ];
     lines.forEach((line, index) => context.fillText(line, 48, 224 + index * 39));
 
-    context.fillStyle = '#687978';
+    context.fillStyle = '#a3c5c2';
     context.fillText(`errores ${snapshot.errors}   intentos ${snapshot.attempts}`, 48, 405);
     context.fillText(`precisión ${snapshot.accuracy}%   ${snapshot.elapsed}s`, 48, 446);
-    context.fillStyle = snapshot.phase === 'finished' ? '#569b73' : '#c6a15a';
+    context.fillStyle = snapshot.phase === 'finalizada' ? '#6ce6a5' : '#f4c866';
     context.font = '700 32px Arial, sans-serif';
     context.fillText(snapshot.phaseLabel, 48, 500);
-    context.fillStyle = '#687978';
+    context.fillStyle = '#a3c5c2';
     context.font = '24px Arial, sans-serif';
     const timeText = snapshot.binTimes
       .map((time) => (time === null ? 'pendiente' : `${time}s`))
@@ -371,79 +358,15 @@ function createPanel(scene) {
   return { mesh: panelMesh, update };
 }
 
-function createLightPanel(scene) {
-  const panel = makeCanvasTexture((context, width, height) => {
-    context.fillStyle = '#f7f5ef';
-    context.fillRect(0, 0, width, height);
-  }, 1024, 640);
-  const panelMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.82, 1.1),
-    new THREE.MeshBasicMaterial({ map: panel.texture, transparent: true }),
-  );
-  panelMesh.position.set(0, 1.76, -2.25);
-  panelMesh.userData.disposeTexture = panel.texture;
-  scene.add(panelMesh);
-
-  function update(snapshot) {
-    const { context, canvas } = panel;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#f7f5ef';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.strokeStyle = '#2f8178';
-    context.lineWidth = 10;
-    context.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
-
-    context.fillStyle = '#2f8178';
-    context.font = '700 50px Arial, sans-serif';
-    context.fillText('LABORATORIO / 3.2', 48, 70);
-    context.fillStyle = '#172f32';
-    context.font = '700 78px Arial, sans-serif';
-    context.fillText(`${snapshot.correct}/20`, 48, 154);
-    context.fillStyle = '#526866';
-    context.font = '700 32px Arial, sans-serif';
-    context.fillText(`correctos   ${snapshot.elapsed}s`, 250, 151);
-
-    context.fillStyle = '#526866';
-    context.font = '700 30px Arial, sans-serif';
-    context.fillText('desglose por forma · bien / mal', 48, 205);
-    const lines = [
-      `Esferas     ${snapshot.correctByCategory.esfera} / ${snapshot.incorrectByCategory.esfera}`,
-      `Cubos       ${snapshot.correctByCategory.cubo} / ${snapshot.incorrectByCategory.cubo}`,
-      `Pirámides   ${snapshot.correctByCategory.piramide} / ${snapshot.incorrectByCategory.piramide}`,
-      `Prismas     ${snapshot.correctByCategory.prisma} / ${snapshot.incorrectByCategory.prisma}`,
-    ];
-    context.fillStyle = '#172f32';
-    context.font = '700 34px Arial, sans-serif';
-    lines.forEach((line, index) => context.fillText(line, 48, 250 + index * 42));
-
-    context.fillStyle = '#687978';
-    context.font = '28px Arial, sans-serif';
-    context.fillText(`errores ${snapshot.errors} · intentos ${snapshot.attempts}`, 48, 435);
-    context.fillText(`precision ${snapshot.accuracy}% · tiempo total ${snapshot.elapsed}s`, 48, 470);
-    context.fillStyle = snapshot.phase === 'finished' ? '#569b73' : '#c6a15a';
-    context.font = '700 36px Arial, sans-serif';
-    context.fillText(snapshot.phaseLabel, 48, 515);
-    context.fillStyle = '#687978';
-    context.font = '26px Arial, sans-serif';
-    const timeText = snapshot.binTimes
-      .map((time) => (time === null ? 'pendiente' : `${time}s`))
-      .join('  ·  ');
-    context.fillText(`botes: ${timeText}`, 48, 565);
-    panel.texture.needsUpdate = true;
-  }
-
-  return { mesh: panelMesh, update };
-}
-
 function createNotification(scene) {
   const panel = makeCanvasTexture((context, width, height) => {
     context.clearRect(0, 0, width, height);
-  }, 1024, 220);
+  }, 1024, 160);
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.78, 0.32),
+    new THREE.PlaneGeometry(1.46, 0.23),
     new THREE.MeshBasicMaterial({ map: panel.texture, transparent: true }),
   );
-  mesh.position.set(0, 1.15, -1.9);
+  mesh.position.set(0.92, 1.62, -1.84);
   mesh.renderOrder = 4;
   mesh.visible = false;
   mesh.userData.disposeTexture = panel.texture;
@@ -451,50 +374,28 @@ function createNotification(scene) {
 
   let timeoutId = null;
   const colors = {
-    info: '#687978',
-    success: '#569b73',
-    warning: '#c6a15a',
-    error: '#c65e6b',
+    info: '#a3c5c2',
+    success: '#6ce6a5',
+    warning: '#f4c866',
+    error: '#ff647c',
   };
 
   function show(text, type = 'info') {
     const accent = colors[type] ?? colors.info;
     const { context, canvas } = panel;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#f7f5ef';
+    context.fillStyle = '#0b2731';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = accent;
     context.fillRect(0, 0, 18, canvas.height);
     context.strokeStyle = accent;
     context.lineWidth = 6;
     context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    context.fillStyle = '#172f32';
-    context.font = '700 30px Arial, sans-serif';
+    context.fillStyle = '#eaf5ef';
+    context.font = '700 34px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    const maxWidth = canvas.width - 100;
-    const words = text.split(/\s+/);
-    const lines = [];
-    let currentLine = '';
-    words.forEach((word) => {
-      const candidate = currentLine ? `${currentLine} ${word}` : word;
-      if (currentLine && context.measureText(candidate).width > maxWidth) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = candidate;
-      }
-    });
-    if (currentLine) lines.push(currentLine);
-    const visibleLines = lines.slice(0, 2);
-    const lineHeight = 42;
-    visibleLines.forEach((line, index) => {
-      context.fillText(
-        line,
-        canvas.width / 2 + 8,
-        canvas.height / 2 + (index - (visibleLines.length - 1) / 2) * lineHeight,
-      );
-    });
+    context.fillText(text.slice(0, 72), canvas.width / 2 + 8, canvas.height / 2);
     panel.texture.needsUpdate = true;
     mesh.visible = true;
     if (timeoutId) window.clearTimeout(timeoutId);
@@ -610,7 +511,7 @@ function createActionButton(scene, { label, action, x, y, z, color }) {
 
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(0.52, 0.18, 0.07),
-    makeMaterial(color, COLORS.ink, 0.38, 0.16),
+    makeMaterial(color, 0x07151d, 0.3, 0.22),
   );
   body.castShadow = true;
   body.userData.action = action;
@@ -625,8 +526,8 @@ function createActionButton(scene, { label, action, x, y, z, color }) {
 }
 
 function createLighting(scene) {
-  scene.add(new THREE.HemisphereLight(0xf7f5ef, 0x789793, 1.65));
-  const key = new THREE.DirectionalLight(0xfffdf4, 2.35);
+  scene.add(new THREE.HemisphereLight(0xbee7e5, 0x08131e, 2.2));
+  const key = new THREE.DirectionalLight(0xf6fff7, 3.2);
   key.position.set(-2.5, 4.8, 2.3);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -636,10 +537,10 @@ function createLighting(scene) {
   key.shadow.camera.bottom = -3;
   scene.add(key);
 
-  const mint = new THREE.PointLight(COLORS.mint, 0.7, 4.2, 2);
+  const mint = new THREE.PointLight(COLORS.mint, 1.7, 4.2, 2);
   mint.position.set(-2.1, 1.7, -0.6);
   scene.add(mint);
-  const coral = new THREE.PointLight(COLORS.coral, 0.55, 4.4, 2);
+  const coral = new THREE.PointLight(COLORS.coral, 1.3, 4.4, 2);
   coral.position.set(2.1, 1.5, 0.7);
   scene.add(coral);
 }
@@ -678,8 +579,6 @@ function createPieceRecords(scene, world, materials) {
         grabDirection: new THREE.Vector3(0, 0, -1),
         grabMode: 'near',
         grabDistance: 0,
-        grabStartedAt: 0,
-        isTargeted: false,
         lastPosition: new THREE.Vector3(),
         lastHandVelocity: new THREE.Vector3(),
         initialPosition: new THREE.Vector3(),
@@ -704,11 +603,11 @@ export function createLabScene({ scene, world, materials }) {
   const tables = TABLE_POSITIONS.map((table) => createTable(scene, world, materials, table));
   const bins = BIN_POSITIONS.map((bin) => createBin(scene, world, materials, bin));
   const { pieces, slotPositions } = createPieceRecords(scene, world, materials);
-  const scorePanel = createLightPanel(scene);
+  const scorePanel = createPanel(scene);
   const notification = createNotification(scene);
   const clampKinematicTarget = createKinematicMoveGuard(world);
   const startButton = createActionButton(scene, {
-    label: 'Comenzar',
+    label: 'COMENZAR',
     action: 'start',
     x: 0.98,
     y: 2.10,
@@ -716,7 +615,7 @@ export function createLabScene({ scene, world, materials }) {
     color: COLORS.mint,
   });
   const resetButton = createActionButton(scene, {
-    label: 'Reiniciar',
+    label: 'REINICIAR',
     action: 'reset',
     x: 1.57,
     y: 2.10,
@@ -766,7 +665,6 @@ export function createLabScene({ scene, world, materials }) {
       piece.stabilityTime = 0;
       piece.enteredBinId = null;
       piece.heldBy = null;
-      piece.grabStartedAt = 0;
       piece.lastPosition.set(position.x, position.y, position.z);
       piece.lastHandVelocity.set(0, 0, 0);
       piece.mesh.visible = true;
@@ -804,67 +702,14 @@ export function createLabScene({ scene, world, materials }) {
     bins.forEach((bin) => {
       piece.body.updateAABB();
       const aabb = piece.body.aabb;
-      const halfX = (aabb.upperBound.x - aabb.lowerBound.x) / 2;
-      const halfY = (aabb.upperBound.y - aabb.lowerBound.y) / 2;
-      const halfZ = (aabb.upperBound.z - aabb.lowerBound.z) / 2;
-      const innerMinX = bin.x - bin.innerWidth / 2;
-      const innerMaxX = bin.x + bin.innerWidth / 2;
-      const innerMinZ = bin.z - bin.innerDepth / 2;
-      const innerMaxZ = bin.z + bin.innerDepth / 2;
-      const outerMinX = bin.x - APP_CONFIG.bin.width / 2;
-      const outerMaxX = bin.x + APP_CONFIG.bin.width / 2;
-      const outerMinZ = bin.z - APP_CONFIG.bin.depth / 2;
-      const outerMaxZ = bin.z + APP_CONFIG.bin.depth / 2;
-      const position = piece.body.position;
-      const verticalOverlap = aabb.upperBound.y > bin.baseY - epsilon
-        && aabb.lowerBound.y < bin.topY + epsilon;
-      const insideFootprint = position.x > innerMinX && position.x < innerMaxX
-        && position.z > innerMinZ && position.z < innerMaxZ;
+      const halfHeight = (aabb.upperBound.y - aabb.lowerBound.y) / 2;
+      const insideFootprint = Math.abs(piece.body.position.x - bin.x) <= bin.innerWidth / 2 + 0.025
+        && Math.abs(piece.body.position.z - bin.z) <= bin.innerDepth / 2 + 0.025;
+      const cameFromAbove = piece.lastPosition.y >= bin.baseY + halfHeight - 0.02;
 
-      if (insideFootprint && aabb.lowerBound.y < bin.baseY + epsilon) {
-        position.y = bin.baseY + halfY + epsilon;
+      if (insideFootprint && cameFromAbove && aabb.lowerBound.y < bin.baseY + epsilon) {
+        piece.body.position.y = bin.baseY + halfHeight + epsilon;
         if (piece.body.velocity.y < 0) piece.body.velocity.y = 0;
-        piece.body.aabbNeedsUpdate = true;
-        corrected = true;
-      }
-
-      if (!verticalOverlap) return;
-
-      const overlapsBinZ = aabb.upperBound.z > outerMinZ && aabb.lowerBound.z < outerMaxZ;
-      const overlapsBinX = aabb.upperBound.x > outerMinX && aabb.lowerBound.x < outerMaxX;
-      const wasInsideX = piece.lastPosition.x >= innerMinX && piece.lastPosition.x <= innerMaxX;
-      const wasInsideZ = piece.lastPosition.z >= innerMinZ && piece.lastPosition.z <= innerMaxZ;
-
-      if (overlapsBinZ && aabb.upperBound.x > outerMinX && aabb.lowerBound.x < innerMinX) {
-        position.x = wasInsideX
-          ? innerMinX + halfX + epsilon
-          : outerMinX - halfX - epsilon;
-        piece.body.velocity.x = 0;
-        piece.body.aabbNeedsUpdate = true;
-        corrected = true;
-      } else if (overlapsBinZ && aabb.lowerBound.x < outerMaxX && aabb.upperBound.x > innerMaxX) {
-        position.x = wasInsideX
-          ? innerMaxX - halfX - epsilon
-          : outerMaxX + halfX + epsilon;
-        piece.body.velocity.x = 0;
-        piece.body.aabbNeedsUpdate = true;
-        corrected = true;
-      }
-
-      piece.body.updateAABB();
-      const updatedAabb = piece.body.aabb;
-      if (overlapsBinX && updatedAabb.upperBound.z > outerMinZ && updatedAabb.lowerBound.z < innerMinZ) {
-        position.z = wasInsideZ
-          ? innerMinZ + halfZ + epsilon
-          : outerMinZ - halfZ - epsilon;
-        piece.body.velocity.z = 0;
-        piece.body.aabbNeedsUpdate = true;
-        corrected = true;
-      } else if (overlapsBinX && updatedAabb.lowerBound.z < outerMaxZ && updatedAabb.upperBound.z > innerMaxZ) {
-        position.z = wasInsideZ
-          ? innerMaxZ - halfZ - epsilon
-          : outerMaxZ + halfZ + epsilon;
-        piece.body.velocity.z = 0;
         piece.body.aabbNeedsUpdate = true;
         corrected = true;
       }
@@ -900,7 +745,6 @@ export function createLabScene({ scene, world, materials }) {
       piece.errorReported = false;
       piece.enteredBinId = null;
       piece.stabilityTime = 0;
-      piece.grabStartedAt = 0;
       setBodyDynamic(piece.body, piece.shape.mass);
       piece.body.wakeUp();
     },
@@ -926,12 +770,12 @@ export function setActionButtonLabel(button, label, color) {
   const labelMesh = button.labelMesh;
   const oldTexture = labelMesh.material.map;
   const { texture } = makeCanvasTexture((context, width, height) => {
-    context.fillStyle = '#334c4c';
+    context.fillStyle = '#0c2731';
     context.fillRect(0, 0, width, height);
     context.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
     context.lineWidth = 12;
     context.strokeRect(8, 8, width - 16, height - 16);
-    context.fillStyle = '#f7f5ef';
+    context.fillStyle = '#eaf5ef';
     context.font = '700 58px Arial, sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';

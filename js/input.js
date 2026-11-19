@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { APP_CONFIG, COLORS } from './config.js';
 
 export class InteractionInput {
   constructor({ camera, renderer, sceneData, game, handPointers }) {
@@ -17,7 +16,10 @@ export class InteractionInput {
 
   update() {
     this.sceneData.pieces.forEach((piece) => {
-      piece.isTargeted = false;
+      piece.mesh.scale.setScalar(piece.state === 'sujeto' ? 1.08 : 1);
+      if (piece.mesh.material?.emissiveIntensity !== undefined) {
+        piece.mesh.material.emissiveIntensity = piece.state === 'sujeto' ? 0.7 : 0.32;
+      }
     });
 
     this.handPointers.forEach((handPointer, index) => {
@@ -42,7 +44,6 @@ export class InteractionInput {
 
       const hit = this.findHandHit(handPointer);
       handPointer.setCursor(hit ? hit.distance : 1.5);
-      if (hit?.piece) hit.piece.isTargeted = true;
       if (hit?.mesh?.userData?.action && pinched && !state.wasPinched) {
         this.game.handleAction(hit.mesh.userData.action);
       }
@@ -50,41 +51,6 @@ export class InteractionInput {
         this.game.beginGrab(hit.piece, handPointer);
       }
       state.wasPinched = pinched;
-    });
-
-    this.sceneData.pieces.forEach((piece) => {
-      const held = piece.state === 'sujeto';
-      const highlighted = held || piece.isTargeted;
-      piece.mesh.scale.setScalar(held ? 1.08 : piece.isTargeted ? 1.045 : 1);
-      if (piece.mesh.material?.emissiveIntensity !== undefined) {
-        piece.mesh.material.emissiveIntensity = held ? 0.58 : piece.isTargeted ? 0.44 : 0.16;
-      }
-      if (piece.mesh.material?.emissive?.setHex) {
-        piece.mesh.material.emissive.setHex(highlighted ? COLORS.mint : piece.shape.emissive);
-      }
-    });
-    this.updateBinHints();
-  }
-
-  updateBinHints() {
-    this.sceneData.bins.forEach((bin) => bin.setHighlight?.(false));
-    const heldPieces = this.sceneData.pieces.filter((piece) => piece.state === 'sujeto');
-    heldPieces.forEach((piece) => {
-      let nearestBin = null;
-      let nearestDistance = Infinity;
-      this.sceneData.bins.forEach((bin) => {
-        const dx = piece.body.position.x - bin.x;
-        const dy = piece.body.position.y - bin.topY;
-        const dz = piece.body.position.z - bin.z;
-        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestBin = bin;
-        }
-      });
-      if (nearestBin && nearestDistance <= APP_CONFIG.interaction.binAssistDistance) {
-        nearestBin.setHighlight?.(true, nearestBin.categoryId === piece.categoryId);
-      }
     });
   }
 

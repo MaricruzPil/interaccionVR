@@ -49,8 +49,6 @@ export class ClassificationGame {
       errors: 0,
       attempts: 0,
       categoryCounts: Object.fromEntries(SHAPE_DEFINITIONS.map((shape) => [shape.id, 0])),
-      correctByCategory: Object.fromEntries(SHAPE_DEFINITIONS.map((shape) => [shape.id, 0])),
-      incorrectByCategory: Object.fromEntries(SHAPE_DEFINITIONS.map((shape) => [shape.id, 0])),
       binTimes: Object.fromEntries(this.sceneData.bins.map((bin) => [bin.id, null])),
     };
   }
@@ -64,7 +62,7 @@ export class ClassificationGame {
     this.pauseStartedAt = null;
     this.pausedDuration = 0;
     this.metrics = this.createMetrics();
-    setActionButtonLabel(this.sceneData.startButton, 'Comenzar', COLORS.mint);
+    setActionButtonLabel(this.sceneData.startButton, 'COMENZAR', COLORS.mint);
     setActionButtonVisibility(this.sceneData.startButton, true);
     setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message('Escenario reiniciado. Pulsa COMENZAR dentro del laboratorio.', 'info');
@@ -86,7 +84,7 @@ export class ClassificationGame {
     this.pauseStartedAt = null;
     this.pausedDuration = 0;
     this.metrics = this.createMetrics();
-    setActionButtonLabel(this.sceneData.startButton, 'En curso', COLORS.mint);
+    setActionButtonLabel(this.sceneData.startButton, 'EN CURSO', COLORS.mint);
     setActionButtonVisibility(this.sceneData.startButton, false);
     setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message('Partida iniciada. Clasifica las veinte piezas.', 'info');
@@ -99,7 +97,7 @@ export class ClassificationGame {
     this.phase = 'paused';
     this.pauseStartedAt = performance.now();
     this.releaseAll();
-    setActionButtonLabel(this.sceneData.startButton, 'Continuar', COLORS.yellow);
+    setActionButtonLabel(this.sceneData.startButton, 'CONTINUAR', COLORS.yellow);
     setActionButtonVisibility(this.sceneData.startButton, true);
     setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message(reason, 'warning');
@@ -111,7 +109,7 @@ export class ClassificationGame {
     this.pausedDuration += performance.now() - this.pauseStartedAt;
     this.pauseStartedAt = null;
     this.phase = 'running';
-    setActionButtonLabel(this.sceneData.startButton, 'En curso', COLORS.mint);
+    setActionButtonLabel(this.sceneData.startButton, 'EN CURSO', COLORS.mint);
     setActionButtonVisibility(this.sceneData.startButton, false);
     this.message('Cronómetro reanudado.', 'info');
     this.refreshHud(true);
@@ -122,11 +120,11 @@ export class ClassificationGame {
     this.phase = 'finished';
     this.finishedAt = performance.now();
     this.releaseAll();
-    setActionButtonLabel(this.sceneData.startButton, 'Completada', COLORS.success);
+    setActionButtonLabel(this.sceneData.startButton, 'COMPLETADA', COLORS.success);
     setActionButtonVisibility(this.sceneData.startButton, false);
     setActionButtonVisibility(this.sceneData.resetButton, true);
     this.message(
-      `Laboratorio completo: 20/20 · ${this.getElapsedSeconds()}s · precisión ${this.getAccuracy()} % · errores ${this.metrics.errors}.`,
+      `Laboratorio completo: 20/20, precisión ${this.getAccuracy()} %, errores ${this.metrics.errors}.`,
       'success',
     );
     this.audio?.finish();
@@ -161,7 +159,6 @@ export class ClassificationGame {
     piece.heldBy = pointer;
     piece.errorReported = false;
     piece.stabilityTime = 0;
-    piece.grabStartedAt = performance.now();
     piece.lastHandVelocity.set(0, 0, 0);
     piece.state = PIECE_STATES.HELD;
     setBodyKinematic(piece.body);
@@ -240,18 +237,11 @@ export class ClassificationGame {
     piece.grabDistance = 0;
     setBodyDynamic(piece.body, piece.shape.mass);
 
-    const heldDuration = performance.now() - piece.grabStartedAt;
-    const releaseSpeed = piece.lastHandVelocity.length();
-    const intentionalRelease = heldDuration >= APP_CONFIG.interaction.grabSettleMs
-      && releaseSpeed >= APP_CONFIG.interaction.releaseMomentumThreshold;
-    piece.body.velocity.setZero();
-    if (intentionalRelease) {
-      piece.body.velocity.set(
-        piece.lastHandVelocity.x,
-        piece.lastHandVelocity.y,
-        piece.lastHandVelocity.z,
-      );
-    }
+    piece.body.velocity.set(
+      piece.lastHandVelocity.x,
+      piece.lastHandVelocity.y,
+      piece.lastHandVelocity.z,
+    );
     const speed = piece.body.velocity.length();
     if (speed > APP_CONFIG.interaction.maxReleaseVelocity) {
       piece.body.velocity.scale(
@@ -259,7 +249,6 @@ export class ClassificationGame {
         piece.body.velocity,
       );
     }
-    piece.grabStartedAt = 0;
     piece.body.angularVelocity.set(0, 0, 0);
     piece.body.wakeUp();
     piece.attempt += 1;
@@ -365,13 +354,13 @@ export class ClassificationGame {
   findContainingBin(piece) {
     return this.sceneData.bins.find((bin) => {
       piece.body.updateAABB();
-      const margin = 0.008;
-      const insideX = piece.body.aabb.lowerBound.x >= bin.x - bin.innerWidth / 2 + margin
-        && piece.body.aabb.upperBound.x <= bin.x + bin.innerWidth / 2 - margin;
-      const insideZ = piece.body.aabb.lowerBound.z >= bin.z - bin.innerDepth / 2 + margin
-        && piece.body.aabb.upperBound.z <= bin.z + bin.innerDepth / 2 - margin;
-      const insideY = piece.body.aabb.lowerBound.y >= bin.baseY + margin
-        && piece.body.aabb.upperBound.y <= bin.topY + 0.02;
+      const tolerance = 0.025;
+      const insideX = piece.body.aabb.lowerBound.x >= bin.x - bin.innerWidth / 2 - tolerance
+        && piece.body.aabb.upperBound.x <= bin.x + bin.innerWidth / 2 + tolerance;
+      const insideZ = piece.body.aabb.lowerBound.z >= bin.z - bin.innerDepth / 2 - tolerance
+        && piece.body.aabb.upperBound.z <= bin.z + bin.innerDepth / 2 + tolerance;
+      const insideY = piece.body.aabb.lowerBound.y >= bin.baseY - tolerance
+        && piece.body.aabb.upperBound.y <= bin.topY + tolerance;
       return insideX && insideZ && insideY;
     }) ?? null;
   }
@@ -383,7 +372,6 @@ export class ClassificationGame {
     this.metrics.correct += 1;
     this.metrics.attempts += 1;
     this.metrics.categoryCounts[piece.categoryId] += 1;
-    this.metrics.correctByCategory[piece.categoryId] += 1;
     if (this.metrics.categoryCounts[piece.categoryId] === 5) {
       this.metrics.binTimes[bin.id] = this.getElapsedSeconds();
     }
@@ -398,7 +386,6 @@ export class ClassificationGame {
     piece.state = PIECE_STATES.ERROR;
     this.metrics.errors += 1;
     this.metrics.attempts += 1;
-    this.metrics.incorrectByCategory[piece.categoryId] += 1;
     this.audio?.error();
     this.message(`Error: ${piece.shape.singular} no corresponde a este bote. Puedes recuperarla.`, 'error');
   }
@@ -425,14 +412,6 @@ export class ClassificationGame {
       accuracy: this.getAccuracy(),
       elapsed: this.getElapsedSeconds(),
       categoryCounts: { ...this.metrics.categoryCounts },
-      correctByCategory: { ...this.metrics.correctByCategory },
-      incorrectByCategory: { ...this.metrics.incorrectByCategory },
-      categoryBreakdown: SHAPE_DEFINITIONS.map((shape) => ({
-        id: shape.id,
-        label: shape.label,
-        correct: this.metrics.correctByCategory[shape.id],
-        incorrect: this.metrics.incorrectByCategory[shape.id],
-      })),
       binTimes: this.sceneData.bins.map((bin) => this.metrics.binTimes[bin.id]),
     };
   }
