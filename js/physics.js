@@ -105,7 +105,7 @@ export function setBodyKinematic(body) {
   body.velocity.setZero();
   body.angularVelocity.setZero();
   body.updateMassProperties();
-  body.collisionResponse = true;
+  body.collisionResponse = false;
   body.wakeUp();
 }
 

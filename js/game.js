@@ -143,19 +143,13 @@ export class ClassificationGame {
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
-    const grabDistance = pointerPosition.distanceTo(piece.body.position);
-    piece.grabMode = grabDistance > APP_CONFIG.interaction.nearGrabDistance ? 'remote' : 'near';
-    piece.grabDistance = Math.min(grabDistance, APP_CONFIG.interaction.remoteGrabDistance);
-    if (piece.grabMode === 'remote') {
-      pointer.pointerObject.getWorldDirection(piece.grabDirection).normalize();
-      piece.grabOffset.set(0, 0, 0);
-    } else {
-      piece.grabOffset.set(
-        piece.body.position.x - pointerPosition.x,
-        piece.body.position.y - pointerPosition.y,
-        piece.body.position.z - pointerPosition.z,
-      );
-    }
+    piece.grabMode = 'near';
+    piece.grabDistance = pointerPosition.distanceTo(piece.body.position);
+    piece.grabOffset.set(
+      piece.body.position.x - pointerPosition.x,
+      piece.body.position.y - pointerPosition.y,
+      piece.body.position.z - pointerPosition.z,
+    );
     piece.grabQuaternion.set(
       piece.body.quaternion.x,
       piece.body.quaternion.y,
@@ -165,6 +159,7 @@ export class ClassificationGame {
     piece.heldBy = pointer;
     piece.errorReported = false;
     piece.stabilityTime = 0;
+    piece.lastHandVelocity.set(0, 0, 0);
     piece.state = PIECE_STATES.HELD;
     setBodyKinematic(piece.body);
     pointer.setAttached(true);
@@ -182,11 +177,7 @@ export class ClassificationGame {
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
-    const target = piece.grabMode === 'remote'
-      ? pointerPosition.add(
-        piece.grabDirection.clone().multiplyScalar(piece.grabDistance),
-      )
-      : pointerPosition.add(piece.grabOffset);
+    const target = pointerPosition.add(piece.grabOffset);
     const halfWidth = APP_CONFIG.room.width / 2 - 0.18;
     const halfDepth = APP_CONFIG.room.depth / 2 - 0.18;
     target.x = THREE.MathUtils.clamp(target.x, -halfWidth, halfWidth);
@@ -213,19 +204,19 @@ export class ClassificationGame {
       currentPosition,
       smoothedTarget,
     ) ?? smoothedTarget;
-    piece.body.velocity.set(
+    const handVelocity = new THREE.Vector3(
       (guardedTarget.x - piece.body.position.x) / safeDelta,
       (guardedTarget.y - piece.body.position.y) / safeDelta,
       (guardedTarget.z - piece.body.position.z) / safeDelta,
     );
-    const velocityLength = piece.body.velocity.length();
+    const velocityLength = handVelocity.length();
     if (velocityLength > APP_CONFIG.interaction.maxGrabVelocity) {
-      piece.body.velocity.scale(
+      handVelocity.multiplyScalar(
         APP_CONFIG.interaction.maxGrabVelocity / velocityLength,
-        piece.body.velocity,
       );
     }
-    piece.lastHandVelocity.set(piece.body.velocity.x, piece.body.velocity.y, piece.body.velocity.z);
+    piece.lastHandVelocity.copy(handVelocity);
+    piece.body.velocity.setZero();
     piece.body.position.set(guardedTarget.x, guardedTarget.y, guardedTarget.z);
     piece.body.quaternion.set(
       piece.grabQuaternion.x,

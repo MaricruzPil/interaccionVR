@@ -682,7 +682,10 @@ export function createLabScene({ scene, world, materials }) {
       const relativeZ = piece.body.position.z - candidate.z;
       const insideX = Math.abs(relativeX) <= candidate.width / 2 - piece.clearance * 0.25;
       const insideZ = Math.abs(relativeZ) <= candidate.depth / 2 - piece.clearance * 0.25;
-      return insideX && insideZ && piece.body.position.y < candidate.topY + supportY;
+      const penetrationTolerance = 0.018;
+      return insideX
+        && insideZ
+        && piece.body.position.y < candidate.topY + supportY - penetrationTolerance;
     });
     if (!table) return false;
 
