@@ -159,7 +159,9 @@ export class ClassificationGame {
     }
     piece.grabMode = 'near';
     piece.grabDistance = carryDistance;
-    piece.grabOffset.copy(pointerToPiece);
+    const pointerQuaternion = new THREE.Quaternion();
+    pointer.pointerObject.getWorldQuaternion(pointerQuaternion);
+    piece.grabOffset.copy(pointerToPiece).applyQuaternion(pointerQuaternion.invert());
     piece.grabQuaternion.set(
       piece.body.quaternion.x,
       piece.body.quaternion.y,
@@ -187,7 +189,11 @@ export class ClassificationGame {
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
-    const target = pointerPosition.add(piece.grabOffset);
+    const pointerQuaternion = new THREE.Quaternion();
+    pointer.pointerObject.getWorldQuaternion(pointerQuaternion);
+    const target = pointerPosition.add(
+      piece.grabOffset.clone().applyQuaternion(pointerQuaternion),
+    );
     const halfWidth = APP_CONFIG.room.width / 2 - 0.18;
     const halfDepth = APP_CONFIG.room.depth / 2 - 0.18;
     target.x = THREE.MathUtils.clamp(target.x, -halfWidth, halfWidth);
