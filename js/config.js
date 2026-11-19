@@ -6,6 +6,14 @@ export const APP_CONFIG = {
   room: { width: 5.8, depth: 4.8, height: 2.6 },
   table: { width: 1.48, depth: 1.08, topY: 0.84, thickness: 0.12 },
   bin: { width: 0.76, depth: 0.68, height: 0.52, wall: 0.075, base: 0.08 },
+  interaction: {
+    grabSmoothing: 0.94,
+    maxHandMove: 0.3,
+    maxGrabVelocity: 6.5,
+    maxReleaseVelocity: 4.2,
+    remoteGrabDistance: 0.72,
+    nearGrabDistance: 0.36,
+  },
   physics: {
     gravity: -9.81,
     fixedStep: 1 / 60,
@@ -109,6 +117,11 @@ export const PIECE_STATES = Object.freeze({
 export function getShapeClearance(shape) {
   if (shape.kind === 'box') return Math.sqrt(3) * (shape.size / 2);
   if (shape.kind === 'pyramid') return Math.sqrt(2) * shape.radius;
+  return shape.radius;
+}
+
+export function getShapeHorizontalExtent(shape) {
+  if (shape.kind === 'box') return shape.size / 2;
   return shape.radius;
 }
 

@@ -102,6 +102,8 @@ export function addPieceBody(world, materials, shape, position) {
 export function setBodyKinematic(body) {
   body.type = CANNON.Body.KINEMATIC;
   body.mass = 0;
+  body.velocity.setZero();
+  body.angularVelocity.setZero();
   body.updateMassProperties();
   body.collisionResponse = true;
   body.wakeUp();

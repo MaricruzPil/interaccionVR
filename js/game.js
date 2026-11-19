@@ -143,11 +143,19 @@ export class ClassificationGame {
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
-    piece.grabOffset.set(
-      piece.body.position.x - pointerPosition.x,
-      piece.body.position.y - pointerPosition.y,
-      piece.body.position.z - pointerPosition.z,
-    );
+    const grabDistance = pointerPosition.distanceTo(piece.body.position);
+    piece.grabMode = grabDistance > APP_CONFIG.interaction.nearGrabDistance ? 'remote' : 'near';
+    piece.grabDistance = Math.min(grabDistance, APP_CONFIG.interaction.remoteGrabDistance);
+    if (piece.grabMode === 'remote') {
+      pointer.pointerObject.getWorldDirection(piece.grabDirection).normalize();
+      piece.grabOffset.set(0, 0, 0);
+    } else {
+      piece.grabOffset.set(
+        piece.body.position.x - pointerPosition.x,
+        piece.body.position.y - pointerPosition.y,
+        piece.body.position.z - pointerPosition.z,
+      );
+    }
     piece.grabQuaternion.set(
       piece.body.quaternion.x,
       piece.body.quaternion.y,
@@ -174,7 +182,11 @@ export class ClassificationGame {
 
     const pointerPosition = new THREE.Vector3();
     pointer.pointerObject.getWorldPosition(pointerPosition);
-    const target = pointerPosition.add(piece.grabOffset);
+    const target = piece.grabMode === 'remote'
+      ? pointerPosition.add(
+        piece.grabDirection.clone().multiplyScalar(piece.grabDistance),
+      )
+      : pointerPosition.add(piece.grabOffset);
     const halfWidth = APP_CONFIG.room.width / 2 - 0.18;
     const halfDepth = APP_CONFIG.room.depth / 2 - 0.18;
     target.x = THREE.MathUtils.clamp(target.x, -halfWidth, halfWidth);
@@ -188,11 +200,14 @@ export class ClassificationGame {
       piece.body.position.z,
     );
     const displacement = target.clone().sub(currentPosition);
-    const maximumHandMove = 0.16;
+    const maximumHandMove = APP_CONFIG.interaction.maxHandMove;
     if (displacement.length() > maximumHandMove) {
       target.copy(currentPosition).add(displacement.normalize().multiplyScalar(maximumHandMove));
     }
-    const smoothedTarget = currentPosition.clone().lerp(target, 0.82);
+    const smoothedTarget = currentPosition.clone().lerp(
+      target,
+      APP_CONFIG.interaction.grabSmoothing,
+    );
     const guardedTarget = this.sceneData.clampKinematicTarget?.(
       piece,
       currentPosition,
@@ -204,7 +219,12 @@ export class ClassificationGame {
       (guardedTarget.z - piece.body.position.z) / safeDelta,
     );
     const velocityLength = piece.body.velocity.length();
-    if (velocityLength > 4.2) piece.body.velocity.scale(4.2 / velocityLength, piece.body.velocity);
+    if (velocityLength > APP_CONFIG.interaction.maxGrabVelocity) {
+      piece.body.velocity.scale(
+        APP_CONFIG.interaction.maxGrabVelocity / velocityLength,
+        piece.body.velocity,
+      );
+    }
     piece.lastHandVelocity.set(piece.body.velocity.x, piece.body.velocity.y, piece.body.velocity.z);
     piece.body.position.set(guardedTarget.x, guardedTarget.y, guardedTarget.z);
     piece.body.quaternion.set(
@@ -222,6 +242,8 @@ export class ClassificationGame {
     if (pointer) pointer.setAttached(false);
     piece.heldBy = null;
     this.heldPieces.delete(piece);
+    piece.grabMode = 'near';
+    piece.grabDistance = 0;
     setBodyDynamic(piece.body, piece.shape.mass);
 
     piece.body.velocity.set(
@@ -230,7 +252,12 @@ export class ClassificationGame {
       piece.lastHandVelocity.z,
     );
     const speed = piece.body.velocity.length();
-    if (speed > 4.2) piece.body.velocity.scale(4.2 / speed, piece.body.velocity);
+    if (speed > APP_CONFIG.interaction.maxReleaseVelocity) {
+      piece.body.velocity.scale(
+        APP_CONFIG.interaction.maxReleaseVelocity / speed,
+        piece.body.velocity,
+      );
+    }
     piece.body.angularVelocity.set(0, 0, 0);
     piece.body.wakeUp();
     piece.attempt += 1;
@@ -259,7 +286,10 @@ export class ClassificationGame {
   }
 
   afterPhysics(simulatedSeconds) {
-    this.sceneData.pieces.forEach((piece) => this.recoverInvalidPiece(piece));
+    this.sceneData.pieces.forEach((piece) => {
+      this.sceneData.resolveTablePenetration?.(piece);
+      this.recoverInvalidPiece(piece);
+    });
     updateVisualTransforms(this.sceneData.pieces);
     if (this.phase === 'running') {
       this.sceneData.pieces.forEach((piece) => this.updatePieceState(piece, simulatedSeconds));
@@ -405,6 +435,7 @@ export class ClassificationGame {
   }
 
   message(text, type = 'info') {
+    this.sceneData.notification?.show(text, type);
     this.onMessage({ text, type });
   }
 }

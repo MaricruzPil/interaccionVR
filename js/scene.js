@@ -7,6 +7,7 @@ import {
   TABLE_POSITIONS,
   getShapeClearance,
   getShapeDefinition,
+  getShapeHorizontalExtent,
   shuffle,
 } from './config.js';
 import { addPieceBody, addStaticBox, setBodyDynamic } from './physics.js';
@@ -154,7 +155,13 @@ function createTable(scene, world, materials, tableDefinition) {
     });
   });
 
-  return { id: tableDefinition.id, mesh: group, topY };
+  return {
+    ...tableDefinition,
+    mesh: group,
+    topY,
+    width,
+    depth,
+  };
 }
 
 function createBin(scene, world, materials, binDefinition) {
@@ -352,6 +359,56 @@ function createPanel(scene) {
   return { mesh: panelMesh, update };
 }
 
+function createNotification(scene) {
+  const panel = makeCanvasTexture((context, width, height) => {
+    context.clearRect(0, 0, width, height);
+  }, 1024, 160);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.46, 0.23),
+    new THREE.MeshBasicMaterial({ map: panel.texture, transparent: true }),
+  );
+  mesh.position.set(0.92, 1.62, -1.84);
+  mesh.renderOrder = 4;
+  mesh.visible = false;
+  mesh.userData.disposeTexture = panel.texture;
+  scene.add(mesh);
+
+  let timeoutId = null;
+  const colors = {
+    info: '#a3c5c2',
+    success: '#6ce6a5',
+    warning: '#f4c866',
+    error: '#ff647c',
+  };
+
+  function show(text, type = 'info') {
+    const accent = colors[type] ?? colors.info;
+    const { context, canvas } = panel;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#0b2731';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = accent;
+    context.fillRect(0, 0, 18, canvas.height);
+    context.strokeStyle = accent;
+    context.lineWidth = 6;
+    context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    context.fillStyle = '#eaf5ef';
+    context.font = '700 34px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(text.slice(0, 72), canvas.width / 2 + 8, canvas.height / 2);
+    panel.texture.needsUpdate = true;
+    mesh.visible = true;
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => {
+      mesh.visible = false;
+      timeoutId = null;
+    }, 2800);
+  }
+
+  return { mesh, show };
+}
+
 function segmentEntryTime(start, end, lower, upper) {
   let entry = 0;
   let exit = 1;
@@ -359,12 +416,15 @@ function segmentEntryTime(start, end, lower, upper) {
   const deltas = [end.x - start.x, end.y - start.y, end.z - start.z];
   const lowers = [lower.x, lower.y, lower.z];
   const uppers = [upper.x, upper.y, upper.z];
+  const boundaryEpsilon = 0.003;
 
   for (let axis = 0; axis < 3; axis += 1) {
     if (Math.abs(deltas[axis]) < 1e-8) {
       if (starts[axis] < lowers[axis] || starts[axis] > uppers[axis]) return null;
       continue;
     }
+    if (starts[axis] >= uppers[axis] - boundaryEpsilon && deltas[axis] >= 0) return null;
+    if (starts[axis] <= lowers[axis] + boundaryEpsilon && deltas[axis] <= 0) return null;
     let axisEntry = (lowers[axis] - starts[axis]) / deltas[axis];
     let axisExit = (uppers[axis] - starts[axis]) / deltas[axis];
     if (axisEntry > axisExit) [axisEntry, axisExit] = [axisExit, axisEntry];
@@ -386,8 +446,8 @@ function createKinematicMoveGuard(world) {
     start.copy(current);
     delta.copy(target).sub(current);
     let safeFactor = 1;
-    const horizontalClearance = piece.clearance + 0.008;
-    const verticalClearance = piece.shape.height / 2 + 0.008;
+    const horizontalClearance = piece.clearance + 0.004;
+    const verticalClearance = piece.shape.height / 2 + 0.002;
 
     world.bodies.forEach((obstacle) => {
       if (obstacle === piece.body || !obstacle.shape) return;
@@ -411,17 +471,17 @@ function createKinematicMoveGuard(world) {
 }
 
 function isPlacementSafe(position, shape, placements) {
-  const clearance = getShapeClearance(shape);
+  const horizontalExtent = getShapeHorizontalExtent(shape);
   const margin = 0.012;
   if (
-    Math.abs(position.x) + clearance + margin > APP_CONFIG.table.width / 2
-    || Math.abs(position.z) + clearance + margin > APP_CONFIG.table.depth / 2
+    Math.abs(position.x) + horizontalExtent + margin > APP_CONFIG.table.width / 2
+    || Math.abs(position.z) + horizontalExtent + margin > APP_CONFIG.table.depth / 2
   ) return false;
 
   return placements.every((placed) => {
-    const otherClearance = getShapeClearance(placed.shape);
-    return Math.abs(position.x - placed.position.x) > clearance + otherClearance + margin
-      || Math.abs(position.z - placed.position.z) > clearance + otherClearance + margin;
+    const otherExtent = getShapeHorizontalExtent(placed.shape);
+    return Math.abs(position.x - placed.position.x) > horizontalExtent + otherExtent + margin
+      || Math.abs(position.z - placed.position.z) > horizontalExtent + otherExtent + margin;
   });
 }
 
@@ -517,6 +577,9 @@ function createPieceRecords(scene, world, materials) {
         heldBy: null,
         grabOffset: new THREE.Vector3(),
         grabQuaternion: new THREE.Quaternion(),
+        grabDirection: new THREE.Vector3(0, 0, -1),
+        grabMode: 'near',
+        grabDistance: 0,
         lastPosition: new THREE.Vector3(),
         lastHandVelocity: new THREE.Vector3(),
         initialPosition: new THREE.Vector3(),
@@ -542,6 +605,7 @@ export function createLabScene({ scene, world, materials }) {
   const bins = BIN_POSITIONS.map((bin) => createBin(scene, world, materials, bin));
   const { pieces, slotPositions } = createPieceRecords(scene, world, materials);
   const scorePanel = createPanel(scene);
+  const notification = createNotification(scene);
   const clampKinematicTarget = createKinematicMoveGuard(world);
   const startButton = createActionButton(scene, {
     label: 'COMENZAR',
@@ -610,6 +674,29 @@ export function createLabScene({ scene, world, materials }) {
 
   resetPieces();
 
+  function resolveTablePenetration(piece) {
+    if (!piece || piece.state === 'sujeto' || piece.state === 'clasificado') return false;
+    piece.body.computeAABB();
+    const verticalExtent = Math.max(
+      piece.shape.height / 2,
+      piece.body.aabb.upperBound.y - piece.body.position.y,
+    );
+    const supportY = verticalExtent + 0.008;
+    const table = tables.find((candidate) => {
+      const relativeX = piece.body.position.x - candidate.x;
+      const relativeZ = piece.body.position.z - candidate.z;
+      const insideX = Math.abs(relativeX) <= candidate.width / 2 - piece.clearance * 0.25;
+      const insideZ = Math.abs(relativeZ) <= candidate.depth / 2 - piece.clearance * 0.25;
+      return insideX && insideZ && piece.body.position.y < candidate.topY + supportY;
+    });
+    if (!table) return false;
+
+    piece.body.position.y = table.topY + supportY;
+    if (piece.body.velocity.y < 0) piece.body.velocity.y = 0;
+    piece.body.aabbNeedsUpdate = true;
+    return true;
+  }
+
   return {
     tables,
     bins,
@@ -617,6 +704,7 @@ export function createLabScene({ scene, world, materials }) {
     scorePanel,
     startButton,
     resetButton,
+    notification,
     interactables,
     resetPieces,
     recoverPiece(piece) {
@@ -634,6 +722,7 @@ export function createLabScene({ scene, world, materials }) {
       piece.body.wakeUp();
     },
     clampKinematicTarget,
+    resolveTablePenetration,
   };
 }
 
