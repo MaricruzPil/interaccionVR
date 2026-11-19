@@ -10,6 +10,7 @@ export const APP_CONFIG = {
     grabSmoothing: 1,
     maxHandMove: 2,
     maxGrabVelocity: 12,
+    grabCarryDistance: 0.52,
     maxReleaseVelocity: 4.2,
     remoteGrabDistance: 0.72,
     nearGrabDistance: 0.36,
