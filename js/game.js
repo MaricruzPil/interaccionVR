@@ -304,7 +304,7 @@ export class ClassificationGame {
       || piece.body.position.y < -0.45;
     if (!invalid && !outside) return;
     this.sceneData.recoverPiece?.(piece);
-    this.message('Una pieza fue recuperada al salir del volumen físico.', 'warning');
+    this.message('Una pieza salió del área y volvió a su mesa.', 'warning');
   }
 
   updatePieceState(piece, delta) {
@@ -342,14 +342,15 @@ export class ClassificationGame {
       piece.stabilityTime = 0;
     }
 
-    if (
-      piece.body.position.y <= piece.clearance + 0.015
-      && piece.body.velocity.length() <= 0.24
-      && performance.now() - this.lastFloorMessageAt > 1200
-    ) {
-      piece.state = PIECE_STATES.RECOVERABLE;
-      this.lastFloorMessageAt = performance.now();
-      this.message('Una pieza está en el piso: todavía es recuperable.', 'warning');
+    const onFloor = piece.body.position.y <= piece.clearance + 0.015
+      && piece.body.velocity.length() <= 0.24;
+    if (onFloor) {
+      const notifyFloor = performance.now() - this.lastFloorMessageAt > 1200;
+      this.sceneData.recoverPiece?.(piece);
+      if (notifyFloor) {
+        this.lastFloorMessageAt = performance.now();
+        this.message('Una pieza cayó al piso y volvió a su mesa.', 'warning');
+      }
     }
   }
 
@@ -388,7 +389,8 @@ export class ClassificationGame {
     this.metrics.errors += 1;
     this.metrics.attempts += 1;
     this.audio?.error();
-    this.message(`Error: ${piece.shape.singular} no corresponde a este bote. Puedes recuperarla.`, 'error');
+    this.message(`Error: ${piece.shape.singular} no corresponde a este bote. Volvió a su mesa.`, 'error');
+    this.sceneData.recoverPiece?.(piece);
   }
 
   getElapsedSeconds() {

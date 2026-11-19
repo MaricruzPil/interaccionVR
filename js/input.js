@@ -10,6 +10,11 @@ export class InteractionInput {
     this.raycaster = new THREE.Raycaster();
     this.pointerStates = handPointers.map(() => ({ wasPinched: false }));
     this.canvasPointer = new THREE.Vector2();
+    this.pointerOrigin = new THREE.Vector3();
+    this.pointerDirection = new THREE.Vector3();
+    this.pointerQuaternion = new THREE.Quaternion();
+    this.pointerToPiece = new THREE.Vector3();
+    this.pointerClosestPoint = new THREE.Vector3();
     this.onPointerDown = this.onPointerDown.bind(this);
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
   }
@@ -27,11 +32,6 @@ export class InteractionInput {
       const pinched = Boolean(handPointer.isPinched?.());
       const heldPiece = this.game.getHoldingPiece(handPointer);
 
-      if (!handPointer.visible && heldPiece) {
-        this.game.releaseGrab(heldPiece);
-        state.wasPinched = false;
-        return;
-      }
       if (heldPiece && !pinched) {
         this.game.releaseGrab(heldPiece);
         state.wasPinched = pinched;
@@ -56,10 +56,8 @@ export class InteractionInput {
 
   findHandHit(handPointer) {
     let nearest = null;
-    this.sceneData.interactables.forEach((mesh) => {
-      const intersections = handPointer.intersectObject(mesh, false);
-      if (!intersections?.length) return;
-      const candidate = intersections[0];
+    const consider = (candidate, mesh) => {
+      if (!candidate || !mesh) return;
       if (!nearest || candidate.distance < nearest.distance) {
         nearest = {
           distance: candidate.distance,
@@ -67,7 +65,56 @@ export class InteractionInput {
           piece: mesh.userData.piece ?? null,
         };
       }
+    };
+
+    this.sceneData.interactables.forEach((mesh) => {
+      const intersections = handPointer.intersectObject(mesh, false);
+      if (!intersections?.length) return;
+      consider(intersections[0], mesh);
     });
+
+    // Algunos visores actualizan el modelo de mano un fotograma después del
+    // rayo interno de OculusHandPointerModel. Repetimos la intersección con
+    // la pose mundial del puntero para no perder el pinchado.
+    const pointerObject = handPointer.pointerObject;
+    if (pointerObject) {
+      const internalRay = handPointer.raycaster?.ray;
+      if (internalRay) {
+        this.pointerOrigin.copy(internalRay.origin);
+        this.pointerDirection.copy(internalRay.direction).normalize();
+      } else {
+        pointerObject.getWorldPosition(this.pointerOrigin);
+        pointerObject.getWorldQuaternion(this.pointerQuaternion);
+        this.pointerDirection.set(0, 0, -1)
+          .applyQuaternion(this.pointerQuaternion)
+          .normalize();
+      }
+      this.raycaster.set(this.pointerOrigin, this.pointerDirection);
+      this.raycaster.intersectObjects(this.sceneData.interactables, false)
+        .forEach((intersection) => consider(intersection, intersection.object));
+
+      // Tolerancia pequeña alrededor del rayo: ayuda cuando el dedo apunta
+      // al borde de una figura sin convertir toda la escena en seleccionable.
+      this.sceneData.pieces.forEach((piece) => {
+        if (piece.state === 'clasificado' || !piece.mesh.visible) return;
+        this.pointerToPiece.set(
+          piece.body.position.x - this.pointerOrigin.x,
+          piece.body.position.y - this.pointerOrigin.y,
+          piece.body.position.z - this.pointerOrigin.z,
+        );
+        const projection = this.pointerToPiece.dot(this.pointerDirection);
+        if (projection <= 0) return;
+        this.pointerClosestPoint.copy(this.pointerDirection)
+          .multiplyScalar(projection)
+          .add(this.pointerOrigin);
+        const distanceToRay = this.pointerClosestPoint.distanceTo(piece.body.position);
+        const hitRadius = Math.max(piece.clearance * 0.72, 0.105);
+        if (distanceToRay <= hitRadius) {
+          consider({ distance: projection }, piece.mesh);
+        }
+      });
+    }
+
     return nearest;
   }
 
